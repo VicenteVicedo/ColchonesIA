@@ -12,6 +12,10 @@ python src/ia_server.py
 ``
 wscat --no-check -c wss://localhost:8765
 ``
+![Imagen de prueba 1](imgs/prueba1.png)
+
+![Prueba 2](imgs/prueba2.png)
+
 
 ## Contexto
 En **Colchones.es**, dentro de las fichas de producto, disponemos de un chat de IA donde el usuario puede realizar consultas sobre el artículo que está visitando. Este sistema se desarrolló inicialmente de manera básica: se envía el HTML de la ficha directamente al modelo de lenguaje. Es un servicio que está operativo actualmente, pero resulta limitado y presenta carencias en la calidad y precisión de las respuestas. 
