@@ -1,15 +1,13 @@
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
 from colchones_rag import get_embeddings_model
 from colchones_rag import configuration
-from conversation_history import ConversationHistory, ConversationHistoryManager
+from conversation_history import ConversationHistoryManager
 
 # Create a ConversationHistoryManager and a default global store
-history_manager = ConversationHistoryManager(base_dir="chroma_db")
-# For backwards compatibility use a default user id 'default'
-chat_history_store = history_manager.get("default")
+history_manager = ConversationHistoryManager(base_dir=configuration["histories_dir"])
 
 prompt = PromptTemplate(
     input_variables=["contexto", "pregunta", "chat_history"],
@@ -41,7 +39,6 @@ prompt = PromptTemplate(
     """
     )
 
-
 vectorstore = Chroma(
     collection_name = configuration["collection_name"],
     persist_directory = configuration["persist_dir"],
@@ -53,32 +50,28 @@ llm = ChatOpenAI(
     temperature=0
 )
 
-
 retriever = vectorstore.as_retriever(
     search_type="similarity", 
     search_kwargs={"k": 5} #devuelve los 5 chunks más similares para incorporarlos al contexto
     )
 
-def main():
-    print("Este módulo ya no ejecuta un bucle CLI. Usa `answer_question(pregunta)` o el servidor WebSocket `ws_server.py`.")
-
-
 def answer_question(pregunta: str, user_id: str = "default", history_items: int = 10) -> str:
     """Responder a una pregunta usando el RAG, actualizar el historial y devolver el texto.
-
-    Esta función encapsula la lógica previa del bucle interactivo para que pueda ser llamada
-    desde un servidor WebSocket o pruebas.
+    Args:
+        pregunta (str): La pregunta del usuario.
+        user_id (str, optional): Identificador del usuario para el historial.
+        history_items (int, optional): Número de entradas del historial a incluir en el prompt
     """
-    # Select the per-user history and add the question
+  
     user_history = history_manager.get(user_id)
     user_history.add_user(pregunta)
 
     #docs = retriever.invoke(pregunta)
     docs = vectorstore.similarity_search_with_relevance_scores(pregunta)
-
-    print(f"Para la pregunta '{pregunta}' se han recuperado los siguientes documentos:")
-    for i, (d, similarity) in enumerate(docs):
-        print(f"Documento {i+1} (similaridad {similarity}): {d.page_content[:200]}...")
+    if configuration["debug"]:
+        print(f"Para la pregunta '{pregunta}' se han recuperado los siguientes documentos:")
+        for i, (d, similarity) in enumerate(docs):
+            print(f"Documento {i+1} (similaridad {similarity}): {d.page_content[:200]}...")
     
     context = "\n\n".join(d.page_content for (d, _similarity) in docs).strip()
 
@@ -92,7 +85,3 @@ def answer_question(pregunta: str, user_id: str = "default", history_items: int 
     user_history.add_assistant(response)
 
     return response
-
-
-if __name__ == "__main__":
-    main()

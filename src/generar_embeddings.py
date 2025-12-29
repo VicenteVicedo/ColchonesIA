@@ -1,6 +1,7 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
+import os
+
 from colchones_rag import get_embeddings_model
 from colchones_rag import configuration
 
@@ -11,6 +12,9 @@ separators = [
 ]
 
 def main():
+    if not os.path.exists(configuration["persist_dir"]):
+        os.makedirs(configuration["persist_dir"], exist_ok=True)
+
     filepath = "document.txt"
     with open(filepath, "r", encoding="utf-8") as file:
         document = file.read()
@@ -21,11 +25,9 @@ def main():
         Chroma.from_texts(
             texts=texts,
             embedding=get_embeddings_model(),
-            collection_name=configuration.collection_name,
-            persist_directory=configuration.persist_dir,
+            collection_name=configuration["collection_name"],
+            persist_directory=configuration["persist_dir"],
         )
-
-
 
 if __name__ == "__main__":
     main()

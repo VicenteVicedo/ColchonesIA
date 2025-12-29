@@ -3,6 +3,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional
 from pathlib import Path
 
+from colchones_rag import configuration
 
 @dataclass
 class Message:
@@ -90,7 +91,7 @@ class ConversationHistoryManager:
     ConversationHistory instances in memory for the process lifetime.
     """
 
-    def __init__(self, base_dir: str = "chroma_db"):
+    def __init__(self, base_dir: str = configuration["histories_dir"]):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._cache: Dict[str, ConversationHistory] = {}
