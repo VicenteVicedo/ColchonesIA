@@ -1,0 +1,38 @@
+[
+  {
+    "role": "user",
+    "content": "¿A qué número puedo llamar para comprar un colchón?"
+  },
+  {
+    "role": "assistant",
+    "content": "Lamentablemente, no tengo información sobre un número de contacto para realizar compras. Te recomendaría visitar nuestro sitio web o buscar en nuestras redes sociales para obtener más detalles sobre cómo adquirir un colchón. Si necesitas ayuda adicional, estaré encantado de asistirte."
+  },
+  {
+    "role": "user",
+    "content": "¿A qué número puedo llamar para comprar un colchón?"
+  },
+  {
+    "role": "assistant",
+    "content": "Lamentablemente, no tengo información sobre un número de contacto para realizar compras. Te sugiero que visites nuestro sitio web o nuestras redes sociales para obtener más detalles sobre cómo adquirir un colchón. Si necesitas más ayuda, estaré aquí para asistirte."
+  },
+  {
+    "role": "user",
+    "content": "¿A qué número puedo llamar para comprar un colchón?"
+  },
+  {
+    "role": "assistant",
+    "content": "Lamentablemente, no tengo información sobre un número de contacto para realizar compras. Te recomiendo visitar nuestro sitio web o nuestras redes sociales para obtener más detalles sobre cómo adquirir un colchón. Si necesitas más ayuda, estaré aquí para asistirte."
+  },
+  {
+    "role": "user",
+    "content": "¿A qué número puedo llamar para comprar un colchón?"
+  },
+  {
+    "role": "assistant",
+    "content": "Lamentablemente, no tengo información sobre un número de contacto para realizar compras. Te sugiero que visites nuestro sitio web o nuestras redes sociales para obtener más detalles sobre cómo adquirir un colchón. Si necesitas más ayuda, estaré aquí para asistirte."
+  },
+  {
+    "role": "user",
+    "content": "¿A qué número puedo llamar para comprar un colchón?"
+  }
+]
