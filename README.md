@@ -3,6 +3,16 @@ Repositorio para almacenar el proyecto capstone de colchones.es para el curso De
 
 # CAPSTONE: Evolución del Chat de IA - Colchones.es
 
+## Cómo probar el RAG
+
+``
+python src/ia_server.py
+``
+
+``
+wscat --no-check -c wss://localhost:8765
+``
+
 ## Contexto
 En **Colchones.es**, dentro de las fichas de producto, disponemos de un chat de IA donde el usuario puede realizar consultas sobre el artículo que está visitando. Este sistema se desarrolló inicialmente de manera básica: se envía el HTML de la ficha directamente al modelo de lenguaje. Es un servicio que está operativo actualmente, pero resulta limitado y presenta carencias en la calidad y precisión de las respuestas. 
 
