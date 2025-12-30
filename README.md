@@ -5,13 +5,14 @@ Repositorio para almacenar el proyecto capstone de colchones.es para el curso De
 
 ## Cómo probar el RAG
 
-``
+Lanzar el servidor WS:
+```
 python src/ia_server.py
-``
-
-``
+```
+Probar con un cliente de websockets:
+```
 wscat --no-check -c wss://localhost:8765
-``
+```
 ![Imagen de prueba 1](imgs/prueba1.png)
 
 ![Prueba 2](imgs/prueba2.png)
