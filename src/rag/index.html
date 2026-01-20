@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Multi-Backend</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --chat-bg: #ffffff;
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --text-main: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #chat-container {
+            width: 400px;
+            height: 550px;
+            background: var(--chat-bg);
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        /* Estilos del Interruptor */
+        .backend-selector {
+            padding: 10px;
+            background: #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #ddd;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--secondary);
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px; width: 14px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            font-size: 0.95rem;
+        }
+        .user-msg { background-color: var(--primary); color: white; align-self: flex-end; margin-left: auto; }
+        .bot-msg { background-color: #e9e9eb; color: var(--text-main); align-self: flex-start; }
+        
+        .status { font-size: 0.75rem; text-align: center; padding: 3px; background: #f9f9f9; }
+        #input-area { display: flex; padding: 15px; }
+        #message-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
+        #send-btn { padding: 10px 20px; margin-left: 10px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div class="backend-selector">
+        <span>Modo: <strong id="mode-text">WebSocket</strong></span>
+        <label class="switch">
+            <input type="checkbox" id="backend-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+    <div id="connection-status" class="status">WS: Conectando...</div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="message-input" placeholder="Escribe un mensaje..." autocomplete="off">
+        <button id="send-btn">Enviar</button>
+    </div>
+</div>
+
+<script>
+    const statusDiv = document.getElementById('connection-status');
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const backendToggle = document.getElementById('backend-toggle');
+    const modeText = document.getElementById('mode-text');
+
+    let useHTTP = false;
+
+    // --- Configuración WebSocket ---
+    const socket = new WebSocket('wss://localhost:8765');
+    
+    socket.onopen = () => { updateWSStatus('Conectado', 'green'); };
+    socket.onerror = () => { updateWSStatus('Error de conexión', 'red'); };
+    socket.onclose = () => { updateWSStatus('Desconectado', 'gray'); };
+    
+    socket.onmessage = (event) => {
+        handleResponse(event.data);
+    };
+
+    function updateWSStatus(text, color) {
+        if (!useHTTP) {
+            statusDiv.innerText = `WS: ${text}`;
+            statusDiv.style.color = color;
+        }
+    }
+
+    // --- Lógica de Cambio de Modo ---
+    backendToggle.addEventListener('change', () => {
+        useHTTP = backendToggle.checked;
+        modeText.innerText = useHTTP ? "HTTP (POST)" : "WebSocket";
+        statusDiv.innerText = useHTTP ? "Listo para peticiones POST" : "WS: Conectado";
+        statusDiv.style.color = "gray";
+    });
+
+    // --- Manejo de Mensajes ---
+    function addMessage(text, className) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', className);
+        msgDiv.innerText = text;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function handleResponse(dataRaw) {
+        try {
+            const data = typeof dataRaw === 'string' ? JSON.parse(dataRaw) : dataRaw;
+            if (data.respuesta) {
+                addMessage(data.respuesta, 'bot-msg');
+            } else if (data.error) {
+                addMessage("Error: " + data.error, 'bot-msg');
+            }
+        } catch (e) {
+            addMessage(dataRaw, 'bot-msg');
+        }
+    }
+
+    async function sendMessage() {
+        const text = messageInput.value.trim();
+        if (!text) return;
+
+        addMessage(text, 'user-msg');
+        messageInput.value = '';
+
+        const payload = {
+            "user_id": "usuario_web_1",
+            "pregunta": text
+        };
+
+        if (useHTTP) {
+            // MODO HTTP POST
+            try {
+                const response = await fetch('http://127.0.0.1:8000/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                handleResponse(data);
+            } catch (error) {
+                addMessage("Error HTTP: " + error.message, 'bot-msg');
+            }
+        } else {
+            // MODO WEBSOCKET
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(payload));
+            } else {
+                addMessage("Error: WebSocket no está conectado", 'bot-msg');
+            }
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+</script>
+</body>
+</html>

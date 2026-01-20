@@ -1,3 +1,5 @@
 pruebas/
 .token
-ia/
+ia_env3.12/
+ia_env/
+src/__pycache__
