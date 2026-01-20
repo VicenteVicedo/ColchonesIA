@@ -5,3 +5,4 @@ ia_env/
 src/__pycache__
 **.env 
 **/__pycache__
+src/modulos/prueba_recomendador.py
