@@ -3,3 +3,5 @@ pruebas/
 ia_env3.12/
 ia_env/
 src/__pycache__
+**.env 
+**/__pycache__
