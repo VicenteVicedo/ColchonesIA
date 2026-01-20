@@ -37,6 +37,7 @@ default_urls = [
 #        persist_directory=configuration["persist_dir"],
 #        )
 
+# url_pagina es la key para identificar los chunks en la base de datos
 def generar_embedding(document, url_pagina):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, separators=chunksSeparators)
     texts = text_splitter.split_text(document)
@@ -53,7 +54,6 @@ def generar_embedding(document, url_pagina):
         embedding_function=get_embeddings_model(),
         persist_directory=configuration["persist_dir"]
     )
-
 
     # PASO CLAVE: Borramos los registros existentes de esta URL antes de insertar los nuevos
     # Esto simula un "upsert" y evita duplicados si el contenido cambió o se movió de chunk

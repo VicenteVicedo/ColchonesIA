@@ -1,6 +1,9 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 configuration = {
     "persist_dir": "./embeddings_db",
@@ -16,7 +19,7 @@ separators = [
 ]
 
 def get_embeddings_model():
-    os.environ["OPENAI_API_KEY"] = "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"
+    os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small" #Tiene que ser el mismo modelo para generar los embeddings y para hacer las consultas
         # or "text-embedding-3-large" 
