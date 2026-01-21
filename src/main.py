@@ -400,7 +400,20 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     else:
         tools_activas = [tool.rag_datos_generales_tienda]
         sys_prompt += "Responde dudas corporativas (envíos, garantías) usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
-
+    
+    sys_prompt += """    
+    INSTRUCCIONES DE FORMATO Y MAQUETACIÓN:
+    1. Tu respuesta se mostrará en una web, así que USA HTML para estructurar el texto.
+    2. NUNCA devuelvas un "muro de texto" denso. Se claro y conciso.
+    3. Si tienes que listar pasos, requisitos o puntos importantes, usa listas desordenadas HTML:
+       <ul>
+         <li><strong>Concepto clave:</strong> Explicación...</li>
+         <li><strong>Otro punto:</strong> Explicación...</li>
+       </ul>
+    4. Usa etiquetas <br> para separar párrafos.
+    5. Usa <strong> para las negritas (no uses **asteriscos**).
+    6. Deja espacio visual entre conceptos."""
+    
     sys_prompt += "\nINSTRUCCIÓN FINAL DE RENDERIZADO:"
     sys_prompt += "\nSi una herramienta te devuelve código HTML (etiquetas <a>, <div>, <img>), TU ÚNICA TAREA ES COPIAR Y PEGAR ESE CÓDIGO HTML TAL CUAL EN TU RESPUESTA."
     sys_prompt += "\nNO lo conviertas a Markdown."
