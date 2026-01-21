@@ -105,7 +105,16 @@ cargar_datos_al_inicio()
 # ==========================================
 
 def generar_html_tarjeta(item, razon):
-    return f"""<p class="razon"><a href="{item['link']}" target="_blank" class="btn-compra">{item['titulo']}</a> ({razon})</p>
+    # 1. LIMPIEZA DE URL (Sanitización)
+    # Quitamos espacios, saltos de línea (\n) y posibles etiquetas <br> que se hayan colado
+    link_limpio = item['link'].strip().replace('\n', '').replace('\r', '').replace('<br>', '').replace(' ', '')
+    titulo_limpio = item['titulo'].strip().replace('\n', '').replace('\r', '').replace('<br>', '').replace(' ', '')
+    
+    # 2. GENERACIÓN HTML
+    return f"""
+    <p class="razon">
+        <a href="{link_limpio}" target="_blank">{titulo_limpio} ({item['id']})</a> ({razon})
+    </p>
     """
 
 def logica_recomendar_colchon(args):
