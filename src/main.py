@@ -252,15 +252,18 @@ def logica_consultar_producto_actual(html_input):
 
 def enrutador_intenciones(mensaje, tiene_html):
     prompt = f"""
-    Eres un clasificador de intenciones para Colchones.es.
-    Responde SOLO con una categoría:
-    1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, dolores, etc).
+    Eres un clasificador de intenciones para el e-commerce Colchones.es.
+    Tu trabajo es filtrar lo que entra al chat.
+    1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestiasdolores, etc).
     2. 'BUSCADOR': Busca almohadas, canapés, somieres, bases tapizdas, ropa de cama o una marca específica.
     3. 'FICHA_PRODUCTO': Pregunta detalles del producto que ve en pantalla {'(Tiene ficha abierta)' if tiene_html else '(NO tiene ficha)'}.
     4. 'GENERAL': Saludos, envíos, devoluciones, garantías.
+   
+    CATEGORÍA DE BLOQUEO:
+    5. 'OFF_TOPIC': El usuario pregunta sobre política, deportes, religión, cocina, matemáticas, programación, famosos, clima o CUALQUIER TEMA que no sea descanso o relacionado con un ecommerce de colchones.es.
 
     Mensaje: "{mensaje}"
-    Categoría:"""
+    Responde SOLO con la categoría (ej: OFF_TOPIC):"""
 
     try:
         resp = client.chat.completions.create(
@@ -363,9 +366,27 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     # 1. ENRUTAMIENTO
     tiene_html = bool(input_data.html_contenido and len(input_data.html_contenido) > 50)
     intencion = enrutador_intenciones(input_data.message, tiene_html)
+    
+    # --- NUEVO: BLOQUEO DE TEMAS ---
+    if intencion == "OFF_TOPIC":
+        respuesta_off = "Soy un asistente virtual especializado exclusivamente en descanso y productos de Colchones.es. No puedo opinar sobre otros temas, pero estaré encantado de ayudarte a elegir tu próximo equipo de descanso."
+        
+        # Guardamos la interacción para que conste, pero no gastamos tokens de GPT-4
+        guardar_interaccion({
+            'user_id': input_data.user_id, 'pregunta': input_data.message, 'respuesta': respuesta_off,
+            'url': input_data.url, 'dominio': input_data.dominio, 'articulo_id': input_data.articulo_id, 'nombre_producto': input_data.nombre_producto
+        })
+        return {"response": respuesta_off}
+    # --------------------------------
 
-    tools_activas = None
-    sys_prompt = "Eres el asistente experto de Colchones.es. "
+    # Definimos el SYSTEM PROMPT con una "Personalidad Restrictiva"
+    sys_prompt = """Eres el asistente experto de Colchones.es. 
+    TU ÚNICO PROPÓSITO es ayudar a los usuarios a dormir mejor y encontrar productos de descanso en la web de colchones.es.
+    
+    REGLAS DE COMPORTAMIENTO:
+    1. Si el usuario saluda, sé amable y profesional.
+    2. Si preguntan por política, fútbol, religión o cultura general, RECHAZA amablemente responder diciendo que solo sabes de descanso.
+    3. No te inventes opiniones personales."""
 
     if intencion == "RECOMENDADOR":
         tools_activas = [tool.recomendar]
@@ -378,7 +399,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         sys_prompt += "Responde dudas sobre el producto que el usuario ve. Usa 'consultar_producto_actual' para leer sus datos."
     else:
         tools_activas = [tool.rag_datos_generales_tienda]
-        sys_prompt += "Responde dudas generales (envíos, garantías). Si piden producto, pregunta qué buscan."
+        sys_prompt += "Responde dudas corporativas (envíos, garantías) usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
 
     sys_prompt += "\nINSTRUCCIÓN: Si una herramienta devuelve HTML (<div...), pégalo EXACTAMENTE igual. No inventes enlaces."
 
@@ -387,7 +408,14 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     messages = [{"role": "system", "content": sys_prompt}] + historial + [{"role": "user", "content": input_data.message}]
 
     try:
-        kwargs = {"model": "gpt-4o", "messages": messages}
+        kwargs = {
+            "model": "gpt-4o",
+            "messages": messages,
+            "temperature": 0.3,       # <--- CAMBIO CRÍTICO: Cero creatividad
+            "top_p": 0.2,           # <--- EXTRA: Solo considera el top 10% de probabilidad
+            "frequency_penalty": 0, # No penalizar repetición de términos técnicos
+            "presence_penalty": 0
+        }
         if tools_activas:
             kwargs["tools"] = tools_activas
             kwargs["tool_choice"] = "auto"
