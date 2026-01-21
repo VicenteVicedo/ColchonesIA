@@ -110,7 +110,6 @@ def generar_html_tarjeta(item, razon):
         <div class="img-container"><img src="{item['imagen']}" alt="{item['titulo']}"></div>
         <div class="info-container">
             <h3>{item['titulo']}</h3>
-            <div class="precio">{item['precio']}</div>
             <p class="razon">{razon}</p>
             <a href="{item['link']}" target="_blank" class="btn-compra">Ver Oferta</a>
         </div>
@@ -402,6 +401,12 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         sys_prompt += "Responde dudas corporativas (envíos, garantías) usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
 
     sys_prompt += "\nINSTRUCCIÓN: Si una herramienta devuelve HTML (<div...), pégalo EXACTAMENTE igual. No inventes enlaces."
+    sys_prompt += "\nINSTRUCCIÓN FINAL DE RENDERIZADO:"
+    sys_prompt += "\nSi una herramienta te devuelve código HTML (etiquetas <a>, <div>, <img>), TU ÚNICA TAREA ES COPIAR Y PEGAR ESE CÓDIGO HTML TAL CUAL EN TU RESPUESTA."
+    sys_prompt += "\nNO lo conviertas a Markdown."
+    sys_prompt += "\nNO cambies el formato."
+    sys_prompt += "\nNO extraigas el texto."
+    sys_prompt += "\nSimplemente escupe el HTML crudo que recibas."
 
     # 2. CHAT CON OPENAI
     historial = recuperar_historial(input_data.user_id, input_data.dominio)
