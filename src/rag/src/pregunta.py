@@ -60,7 +60,7 @@ def answer_question(pregunta: str, user_id: str = "default", history_items: int 
     user_history = history_manager.get(user_id)
     user_history.add_user(pregunta)
 
-    context = get_context_embeddings(pregunta)
+    context, _sources = get_context_embeddings(pregunta)
 
     # Renderizar las últimas entradas del historial para inyectarlas en el prompt
     rendered_history = user_history.render_for_prompt(n=history_items)

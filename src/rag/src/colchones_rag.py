@@ -41,4 +41,5 @@ def get_context_embeddings(pregunta: str):
             print(f"Documento {i+1} (similaridad {similarity}): {d.page_content[:200]}...")
     
     context = "\n\n".join(d.page_content for (d, _similarity) in docs).strip()
-    return context
+    sources = [doc.metadata["source"] for (doc, _similitud) in docs]
+    return (context, sources)

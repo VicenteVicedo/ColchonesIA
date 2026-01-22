@@ -325,8 +325,8 @@ async def get_context_rag_endpoint(input_data: GetContextInput, api_key: str = S
     if api_key != MI_CLAVE_SECRETA:
         raise HTTPException(status_code=403, detail="Acceso denegado")
 
-    contexto_rag = get_context_embeddings(input_data.message)
-    return {"context": contexto_rag}
+    contexto_rag, sources = get_context_embeddings(input_data.message)
+    return {"context": contexto_rag, "sources": sources}
 
 class EmbeddingGenerationInput(BaseModel):
     url: Optional[str]
@@ -456,7 +456,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
             elif name == "consultar_producto_actual":
                 res_tool = logica_consultar_producto_actual(input_data.html_contenido)
             elif name == "buscar_info_general":
-                res_tool = get_context_embeddings(input_data.message)
+                res_tool, _sources = get_context_embeddings(input_data.message)
             
             messages.append(msg_ia)
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": res_tool})
