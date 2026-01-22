@@ -457,6 +457,8 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
                 res_tool = logica_consultar_producto_actual(input_data.html_contenido)
             elif name == "buscar_info_general":
                 res_tool, _sources = get_context_embeddings(input_data.message)
+                if _sources:
+                    res_tool = f"{res_tool} \n\n(Indica al usuario que puede consultar la siguiente fuente para obtener más información: {_sources[0]})"
             
             messages.append(msg_ia)
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": res_tool})

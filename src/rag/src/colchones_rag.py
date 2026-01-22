@@ -35,11 +35,17 @@ vectorstore = Chroma(
 
 def get_context_embeddings(pregunta: str):
     docs = vectorstore.similarity_search_with_relevance_scores(pregunta)
+    # Ordenamos por similitud descendiente para que el primer documento sea el más relevante
+    try:
+        docs = sorted(docs, key=lambda pair: pair[1], reverse=True)
+    except Exception:
+        # If structure is unexpected, leave as-is
+        pass
     if configuration["debug"]:
         print(f"Para la pregunta '{pregunta}' se han recuperado los siguientes documentos:")
         for i, (d, similarity) in enumerate(docs):
             print(f"Documento {i+1} (similaridad {similarity}): {d.page_content[:200]}...")
     
     context = "\n\n".join(d.page_content for (d, _similarity) in docs).strip()
-    sources = [doc.metadata["source"] for (doc, _similitud) in docs]
+    sources = [doc.metadata.get("source") for (doc, _similitud) in docs]
     return (context, sources)
