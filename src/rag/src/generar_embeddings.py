@@ -11,8 +11,10 @@ import os
 try:
     # Intento 1: Cuando se llama desde main.py
     from rag.src.colchones_rag import get_embeddings_model, configuration, separators as chunksSeparators
+    from rag.src.scrap_url import obtener_contenido_url
 except (ImportError, ModuleNotFoundError):
     # Intento 2: Cuando ejecutas este archivo directamente
+    from scrap_url import obtener_contenido_url
     from colchones_rag import get_embeddings_model, configuration, separators as chunksSeparators
 
 load_dotenv()
@@ -22,7 +24,15 @@ default_urls = [
     "sobre-envio-recepcion-pedido.php", "sobre-devoluciones.php", 
     "sobre-condiciones-generales.php", "colchones-on-line-atencion-cliente.php",
     "como-dormir-bien.php", "como-elegir-un-colchon-y-base.php",
-    "informacion/mejores-colchones-ocu-2025/", "compromisos.php", "sobre-garantias.php"
+    "informacion/mejores-colchones-ocu-2025/", "compromisos.php", "sobre-garantias.php",
+
+    "rebajas-ofertas-descuentos-promociones.php","firmeza-del-colchon.php",
+    "medidas-de-colchones.php","tipos-de-colchones.php","colchones-estilos-de-vida.php",
+    "consejos-colchon-latex.php","consejos-colchon-viscoelastica.php","consejos-limpiar-cambiar-colchon.php",
+    "como-elegir-un-colchon-y-base/composicion-somier-laminas.php",
+    "como-elegir-un-colchon-y-base/estructura-canapes-y-tapas.php",
+    "como-elegir-un-colchon-y-base/sistemas-apertura-canapes.php",
+    "informacion/fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado/"
 ]
 
 #def generar_embedding(document):
@@ -69,6 +79,7 @@ def generar_embedding(document, url_pagina):
         metadatas=metadatas,
         ids=ids
     )
+    print(f"Se han generado {len(texts)} chunks de texto para la URL {url_pagina}.")
 
 def limpiar_html(texto_sucio):
     if not texto_sucio:
@@ -103,6 +114,7 @@ def limpiar_html(texto_sucio):
     texto_final = "\n".join(linea for linea in lineas if linea)
 
     return texto_final
+
 
 def obtener_embeddings(urls=None):
     try:
@@ -139,11 +151,23 @@ def obtener_embeddings(urls=None):
             cursor.execute(query, urls)
             resultados = cursor.fetchall()
 
-            print(f"Se encontraron {len(resultados)} registros:\n")
-            for fila in resultados:
-                url_actual = fila["url"]
-                texto_limpio = limpiar_html(fila["textoPagina"])
-                generar_embedding(texto_limpio, url_actual)
+            # Si la página no está en la base de datos, intentar obtener su contenido vía scrapping
+            try:
+                if len(resultados) == 0 and len(urls) == 1:
+                    print(f"La URL {urls[0]} no se encontró en la base de datos. Intentando vía scrapping...")
+                    contenido_pagina = obtener_contenido_url(urls[0])
+                    generar_embedding(contenido_pagina, urls[0])
+                else:
+                    print(f"Se encontraron {len(resultados)} registros:\n")
+                    for fila in resultados:
+                        url_actual = fila["url"]
+                        texto_limpio = limpiar_html(fila["textoPagina"])
+                        generar_embedding(texto_limpio, url_actual)
+
+            except Exception as e:
+                print(f"Error al obtener contenido vía scrapping: {e}")
+
+            
 
     except Error as e:
         print(f"Error al conectar a MySQL: {e}")
