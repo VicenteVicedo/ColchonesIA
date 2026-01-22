@@ -429,7 +429,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         kwargs = {
             "model": "gpt-4o",
             "messages": messages,
-            "temperature": 0.3,       # <--- CAMBIO CRÍTICO: Cero creatividad
+            "temperature": 0.1,       # <--- CAMBIO CRÍTICO: Cero creatividad
             "top_p": 0.2,           # <--- EXTRA: Solo considera el top 10% de probabilidad
             "frequency_penalty": 0, # No penalizar repetición de términos técnicos
             "presence_penalty": 0
@@ -458,7 +458,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
             elif name == "buscar_info_general":
                 res_tool, _sources = get_context_embeddings(input_data.message)
                 if _sources:
-                    res_tool = f"{res_tool} \n\n(Indica al usuario que puede consultar la siguiente fuente para obtener más información: {_sources[0]})"
+                    res_tool = f"{res_tool} \n\n(Indica al usuario que puede consultar la siguiente fuente para obtener más información: https://colchones.es{_sources[0]})"
             
             messages.append(msg_ia)
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": res_tool})
