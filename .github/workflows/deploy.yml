@@ -18,5 +18,5 @@ jobs:
           script: |
             cd /home/ubuntu/fastapi_backend
             git pull origin main
-            systemctl restart chati_api.service 
+            sudo systemctl restart chati_api.service 
             # hay que configurar sudo para que el usuario ubuntu pueda hacer el restart sin contraseña
