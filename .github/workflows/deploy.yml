@@ -17,6 +17,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ubuntu/fastapi_backend
-            git pull origin main
+            git pull origin-ssh main
             sudo systemctl restart chati_api.service 
             # hay que configurar sudo para que el usuario ubuntu pueda hacer el restart sin contraseña
