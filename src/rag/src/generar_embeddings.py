@@ -26,7 +26,7 @@ default_urls = [
     "como-dormir-bien.php", "como-elegir-un-colchon-y-base.php",
     "informacion/mejores-colchones-ocu-2025/", "compromisos.php", "sobre-garantias.php",
 
-    "rebajas-ofertas-descuentos-promociones.php","firmeza-del-colchon.php",
+    "firmeza-del-colchon.php",
     "medidas-de-colchones.php","tipos-de-colchones.php","colchones-estilos-de-vida.php",
     "consejos-colchon-latex.php","consejos-colchon-viscoelastica.php","consejos-limpiar-cambiar-colchon.php",
     "como-elegir-un-colchon-y-base/composicion-somier-laminas.php",
