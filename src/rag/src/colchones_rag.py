@@ -20,12 +20,12 @@ separators = [
 
 def get_embeddings_model():
     os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-    embeddings = OpenAIEmbeddings(
+    embeddings_model = OpenAIEmbeddings(
         model="text-embedding-3-small"
         #model="text-embedding-3-large" 
     )
 
-    return embeddings
+    return embeddings_model
 
 vectorstore = Chroma(
     collection_name = configuration["collection_name"],
@@ -34,7 +34,7 @@ vectorstore = Chroma(
 )
 
 def get_context_embeddings(pregunta: str):
-    docs = vectorstore.similarity_search_with_relevance_scores(pregunta)
+    docs = vectorstore.similarity_search_with_relevance_scores(pregunta, k=3)
 
     try:
         docs = sorted(docs, key=lambda pair: pair[1], reverse=True)

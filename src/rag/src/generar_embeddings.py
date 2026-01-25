@@ -60,9 +60,9 @@ def generar_embedding(document, url_pagina):
 
     # Inicializamos el vectorstore
     vectorstore = Chroma(
-        collection_name=configuration["collection_name"],
+        collection_name=configuration.get("collection_name"),
         embedding_function=get_embeddings_model(),
-        persist_directory=configuration["persist_dir"]
+        persist_directory=configuration.get("persist_dir")
     )
 
     # PASO CLAVE: Borramos los registros existentes de esta URL antes de insertar los nuevos
