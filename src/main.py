@@ -458,8 +458,6 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
             elif name == "buscar_info_general":
                 res_tool, _sources = get_context_embeddings(input_data.message)
                 if _sources:
-                    _sources = [("/" + s) if not s.startswith("http") else s for s in _sources]
-
                     res_tool = f"{res_tool} \n\n(Indica al usuario que puede consultar la siguiente fuente para obtener más información: https://www.colchones.es{_sources[0]})"
             
             messages.append(msg_ia)

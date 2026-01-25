@@ -120,7 +120,7 @@
     let useHTTP = false;
 
     // --- Configuración WebSocket ---
-    const socket = new WebSocket('wss://localhost:8765');
+    const socket = new WebSocket('wss://127.0.0.1:8765');
     
     socket.onopen = () => { updateWSStatus('Conectado', 'green'); };
     socket.onerror = () => { updateWSStatus('Error de conexión', 'red'); };

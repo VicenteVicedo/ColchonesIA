@@ -5,7 +5,7 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
-import html
+from scrap_url import preprocesar_html
 import os
 
 try:
@@ -81,40 +81,6 @@ def generar_embedding(document, url_pagina):
     )
     print(f"Se han generado {len(texts)} chunks de texto para la URL {url_pagina}.")
 
-def limpiar_html(texto_sucio):
-    if not texto_sucio:
-        return ""
-
-    # 1. Corregir errores de codificación (Moji-bake: VÃ\xaddeos -> Vídeos)
-    try:
-        texto = texto_sucio.encode('latin-1').decode('utf-8')
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        texto = texto_sucio
-
-    # 2. Decodificar entidades HTML (&eacute; -> é)
-    texto = html.unescape(texto)
-
-    # 3. Procesar con BeautifulSoup para manejar bloques
-    soup = BeautifulSoup(texto, "html.parser")
-
-    # Definimos las etiquetas que queremos que generen un salto de línea
-    tags_bloque = ['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'tr']
-    
-    for tag in soup.find_all(tags_bloque):
-        # Añadimos un espacio/salto al final del contenido de la etiqueta
-        tag.append('\n')
-
-    # Extraemos el texto
-    texto_plano = soup.get_text()
-
-    # 4. Limpieza final de espacios
-    # Eliminamos espacios en blanco al inicio/final de cada línea y 
-    # evitamos que se acumulen más de dos saltos de línea seguidos
-    lineas = [linea.strip() for linea in texto_plano.splitlines()]
-    texto_final = "\n".join(linea for linea in lineas if linea)
-
-    return texto_final
-
 
 def obtener_embeddings(urls=None):
     try:
@@ -127,18 +93,17 @@ def obtener_embeddings(urls=None):
 
         # Configuración de la conexión (vía túnel SSH)
         connection = mysql.connector.connect(
-            host='127.0.0.1',
-            port=3306, 
+            host=os.getenv('BBDD_IP'),
+            port=os.getenv('BBDD_PORT'), 
             user=os.getenv('mysql_user'),
             password=os.getenv('mysql_pass'),
-            database='colchones'
+            database=os.getenv('BBDD_NAME')
         )
 
         if connection.is_connected():
             cursor = connection.cursor(dictionary=True) # Para obtener resultados como dict
             cursor.execute("SET SESSION group_concat_max_len = 2000000;")            
 
-            # La consulta con JOINs
             query = """
                 SELECT url , concat(group_concat(if(titulo1 <> "", concat(titulo1, " " , m.texto), concat(h1, " " , m.texto))), group_concat(cont.texto, " " , "\n")) as textoPagina
                 FROM my_colchoneses_paginas_modulos m
@@ -161,11 +126,11 @@ def obtener_embeddings(urls=None):
                     print(f"Se encontraron {len(resultados)} registros:\n")
                     for fila in resultados:
                         url_actual = fila["url"]
-                        texto_limpio = limpiar_html(fila["textoPagina"])
+                        texto_limpio = preprocesar_html(fila["textoPagina"])
                         generar_embedding(texto_limpio, url_actual)
 
             except Exception as e:
-                print(f"Error al obtener contenido vía scrapping: {e}")
+                print(f"Error al obtener embeddings : {e}")
 
             
 

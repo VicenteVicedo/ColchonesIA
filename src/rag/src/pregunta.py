@@ -1,7 +1,6 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
-from colchones_rag import get_embeddings_model
 from colchones_rag import configuration
 from colchones_rag import get_context_embeddings
 from conversation_history import ConversationHistoryManager

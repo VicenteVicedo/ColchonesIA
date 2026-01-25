@@ -1,15 +1,15 @@
 from bs4 import BeautifulSoup
 import html
 
-def preprocesar_html(texto_sucio, tags=None):
-    if not texto_sucio:
+def preprocesar_html(html_sin_procesar, tags=None, min_length=None) -> str:
+    if not html_sin_procesar:
         return ""
 
     # 1. Corregir errores de codificación (Moji-bake: VÃ\xaddeos -> Vídeos)
     try:
-        texto = texto_sucio.encode('latin-1').decode('utf-8')
+        texto = html_sin_procesar.encode('latin-1').decode('utf-8')
     except (UnicodeEncodeError, UnicodeDecodeError):
-        texto = texto_sucio
+        texto = html_sin_procesar
 
     # 2. Decodificar entidades HTML (&eacute; -> é)
     texto = html.unescape(texto)
@@ -30,11 +30,12 @@ def preprocesar_html(texto_sucio, tags=None):
         partes = []
         for etiqueta in tags:
             for el in soup.find_all(etiqueta):
-                if len(el.get_text()) >= 50:
+                if min_length and len(el.get_text()) >= min_length:
                     partes.append(el.get_text())
         texto_plano = "\n".join(partes)
-
-    #texto_plano = soup.get_text()
+    
+    else:
+        texto_plano = soup.get_text()
 
     # 4. Limpieza final de espacios
     # Eliminamos espacios en blanco al inicio/final de cada línea y 
@@ -116,6 +117,6 @@ if __name__ == "__main__":
     urls = ["https://www.colchones.es/rebajas-ofertas-descuentos-promociones.php","https://www.colchones.es/firmeza-del-colchon.php","https://www.colchones.es/medidas-de-colchones.php","https://www.colchones.es/tipos-de-colchones.php","https://www.colchones.es/colchones-estilos-de-vida.php","https://www.colchones.es/consejos-colchon-latex.php","https://www.colchones.es/consejos-colchon-viscoelastica.php","https://www.colchones.es/consejos-limpiar-cambiar-colchon.php","https://www.colchones.es/como-elegir-un-colchon-y-base/composicion-somier-laminas.php","https://www.colchones.es/como-elegir-un-colchon-y-base/estructura-canapes-y-tapas.php","https://www.colchones.es/como-elegir-un-colchon-y-base/sistemas-apertura-canapes.php","https://www.colchones.es/informacion/fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado/"]
 
     for url in urls:
-        contenido = preprocesar_html(obtener_pagina_scrapping(url), ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"])
+        contenido = preprocesar_html(obtener_pagina_scrapping(url), ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"], 50)
         print(f"Contenido extraído de {url}:\n{contenido}...\n\n")
         input("Presiona Enter para continuar...")

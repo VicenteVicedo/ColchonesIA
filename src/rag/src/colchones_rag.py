@@ -21,8 +21,8 @@ separators = [
 def get_embeddings_model():
     os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small" #Tiene que ser el mismo modelo para generar los embeddings y para hacer las consultas
-        # or "text-embedding-3-large" 
+        model="text-embedding-3-small"
+        #model="text-embedding-3-large" 
     )
 
     return embeddings
@@ -35,17 +35,18 @@ vectorstore = Chroma(
 
 def get_context_embeddings(pregunta: str):
     docs = vectorstore.similarity_search_with_relevance_scores(pregunta)
-    # Ordenamos por similitud descendiente para que el primer documento sea el más relevante
+
     try:
         docs = sorted(docs, key=lambda pair: pair[1], reverse=True)
     except Exception:
-        # If structure is unexpected, leave as-is
         pass
+
     if configuration["debug"]:
         print(f"Para la pregunta '{pregunta}' se han recuperado los siguientes documentos:")
         for i, (d, similarity) in enumerate(docs):
-            print(f"Documento {i+1} (similaridad {similarity}): {d.page_content[:200]}...")
+            print(f"Documento {i+1} (similaridad {similarity}): {d.page_content}...")
     
-    context = "\n\n".join(d.page_content for (d, _similarity) in docs).strip()
-    sources = [doc.metadata.get("source") for (doc, _similitud) in docs]
+    context = "\n\n".join(d.page_content for (d, _) in docs).strip()
+    sources = [doc.metadata.get("source") for (doc, _) in docs]
+    sources = [("/" + s) if not s.startswith("http") else s for s in sources]
     return (context, sources)
