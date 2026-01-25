@@ -5,6 +5,20 @@ Repositorio para almacenar el proyecto capstone de colchones.es para el curso De
 
 ## Índice
 - [Memoria inicial](#memoria-inicial)
+    - [Contexto](#contexto)
+    - [Propuesta](#propuesta)
+    - [Alcance y Consideraciones](#alcance-y-consideraciones)
+- [RAG](#rag)
+    - [Objetivo](#objetivo)
+    - [Implementación](#implementación)
+        - [Obtención y tratamiento de datos](#obtención-y-tratamiento-de-datos)
+        - [Chunking](#chunking)
+        - [Modelo de embeddings](#modelo-de-embeddings)
+        - [Base de datos vectorial](#base-de-datos-vectorial)
+        - [Recuperación y generación de respuestas](#recuperación-y-generación-de-respuestas)
+    - [Despliegue](#despliegue)
+    - [Integración con el chat de IA actual](#integración-con-el-chat-de-ia-actual)
+    - [Video de demostración](#video-de-demostración)
 
 ## Memoria inicial
 
@@ -112,25 +126,28 @@ def get_context_embeddings(pregunta: str):
 Utilizamos la función `similarity_search_with_relevance_scores` para recuperar los 3 fragmentos más relevantes en función de la consulta del usuario. Ordenamos los documentos por su puntuación de similitud y los concatenamos para formar el contexto que se proporcionará al modelo de lenguaje. Además, recuperamos las fuentes con las que previamente hemos etiquetado cada chunk para poder mostrarlas en la respuesta y ofrecer al usuario la posibilidad de consultar la fuente original para ampliar información.
 
 ### Despliegue
-El sistema RAG se puede probar de forma autónoma, pero se ha diseñado con la idea de integrarlo posteriormente en el chat de IA de Colchones.es. Para facilitar las pruebas, se ha implementado un servidor WebSocket (y otro restful) que permite enviar preguntas y recibir respuestas desde el frontend de ejemplo.
+El sistema RAG se puede probar de forma autónoma, pero se ha diseñado con la idea de integrarlo posteriormente en el chat de IA de Colchones.es. El RAG se ubica dentro de una subcarpeta RAG dentro de src, donde se encuentra el código del chatbot principal. Para facilitar las pruebas, se ha implementado un servidor WebSocket (y otro restful) que permite enviar preguntas y recibir respuestas desde el frontend de ejemplo.
 Para generar el archivo requirements.txt se ha utilizado pipreqs.
 
 Una vez instaladas las dependencias, se puede lanzar el servidor WebSocket con el siguiente comando:
 
-```python src/ia_server.py
+```bash
+python src/rag/src/ia_server.py
 ```
 Desde línea de comandos podemos probar el servidor con un cliente de websockets como wscat:
 
-```wscat --no-check -c wss://localhost:8765
+```bash
+wscat --no-check -c wss://localhost:8765
 ```
 
 ![Imagen de prueba 1](imgs/prueba1.png)
 
 ![Prueba 2](imgs/prueba2.png)
 
-Para probar la interfaz debemos configurar el navegador para que acepte certificados autofirmados, ya que el servidor utiliza SSL para las comunicaciones.
+Para probar el RAG con la interfaz debemos configurar el navegador para que acepte certificados autofirmados, ya que el servidor utiliza SSL para las comunicaciones.
 
 ![Prueba 3](imgs/rag3.png)
+*Llamada al RAG con el frontend [index.html](src/rag/index.html)*
 
 ### Integración con el chat de IA actual
 El sistema RAG está diseñado para integrarse con el chat de IA existente en Colchones.es. Para ello, se integra en forma de tool que el modelo de lenguaje puede invocar cuando el cliente no pregunta sobre un producto específico, sino sobre aspectos generales de la tienda (políticas de devolución, formas de pago, plazos de entrega, etc.). El flujo de integración es el siguiente:
@@ -154,3 +171,21 @@ if name == "buscar_info_general":
             
 ```
 Si la consulta generada tiene una fuente asociada, se incluye en el prompt para que el modelo de lenguaje pueda indicársela al usuario en la respuesta.
+
+Para probar los documentos recuperados, se ha habilitado un endpoint RESTful que permite enviar preguntas y recibir respuestas en formato JSON y ver los documentos recuperados con las fuentes asociadas.
+```
+class GetContextInput(BaseModel):
+    message: str
+
+@app.post("/get_context_rag")
+async def get_context_rag_endpoint(input_data: GetContextInput, api_key: str = Security(api_key_header)):
+    if api_key != MI_CLAVE_SECRETA:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    contexto_rag, sources = get_context_embeddings(input_data.message)
+    return {"context": contexto_rag, "sources": sources}
+```
+
+
+#### Video de demostración
+[Video de demostración del sistema RAG](videos/rag_demo.mp4)
