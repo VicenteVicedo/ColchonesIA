@@ -5,16 +5,18 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
-from scrap_url import preprocesar_html
+
 import os
 
 try:
     # Intento 1: Cuando se llama desde main.py
     from rag.src.colchones_rag import get_embeddings_model, configuration, separators as chunksSeparators
     from rag.src.scrap_url import obtener_contenido_url
+    from rag.src.scrap_url import preprocesar_html
 except (ImportError, ModuleNotFoundError):
     # Intento 2: Cuando ejecutas este archivo directamente
     from scrap_url import obtener_contenido_url
+    from scrap_url import preprocesar_html
     from colchones_rag import get_embeddings_model, configuration, separators as chunksSeparators
 
 load_dotenv()
