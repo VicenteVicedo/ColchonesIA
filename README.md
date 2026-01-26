@@ -8,6 +8,7 @@ Repositorio para almacenar el proyecto capstone de colchones.es para el curso De
     - [Contexto](#contexto)
     - [Propuesta](#propuesta)
     - [Alcance y Consideraciones](#alcance-y-consideraciones)
+- [Descripción General](#descripción-general)
 - [RAG](#rag)
     - [Objetivo](#objetivo)
     - [Implementación](#implementación)
@@ -18,7 +19,12 @@ Repositorio para almacenar el proyecto capstone de colchones.es para el curso De
         - [Recuperación y generación de respuestas](#recuperación-y-generación-de-respuestas)
     - [Despliegue](#despliegue)
     - [Integración con el chat de IA actual](#integración-con-el-chat-de-ia-actual)
-    - [Video de demostración](#video-de-demostración)
+- [Explicación del Modelo de Recomendación](#explicación-del-modelo-de-recomendación)
+    - [Funcionamiento de la tool recomendar](#funcionamiento-de-la-tool-recomendar)
+- [Funcionamiento de la tool consultar_ficha](#funcionamiento-de-la-tool-consultar_ficha)
+- [Funcionamiento de la tool buscar_accesorios](#Funcionamiento-de-la-tool-buscar_accesorios)
+- [Videos de demostración](#videos-de-demostración)
+
 
 ## Memoria inicial
 
@@ -57,7 +63,10 @@ Debido a la coincidencia con el periodo navideño, la implementación de estos t
 - Interacción LLM ↔ Herramientas: el LLM puede generar una tool-call; el backend ejecuta la tool (sin enviar datos sensibles al LLM), añade la respuesta de la tool al historial como rol tool y solicita al LLM la respuesta final (HTML listo para mostrar).
 
 - Seguridad y operativa: acceso por x-api-key, persistencia de interacciones en BD para contexto, y uso de un vectorstore/RAG para preguntas generales sobre la tienda.
+
 Ejemplo de consulta dentro de una ficha de producto
+
+![Imagen del funcionamiento](imgs/funcionamietno.png)
 
 ---
 
@@ -206,7 +215,7 @@ async def get_context_rag_endpoint(input_data: GetContextInput, api_key: str = S
 
 ---
 
-### Explicación del Modelo de Recomendación (ML):
+### Explicación del Modelo de Recomendación
 /src/modulos/preparar_encuestas.py: procesa el CSV original encuestas_colchones.csv, normaliza columnas, extrae filas por persona (mujer/hombre) y genera un CSV limpio encuestas_limpio.csv con features útiles (sexo, altura, peso, imc, nucleo, grosor, firmeza, valoracion, molestias antes/después, duerme_en_pareja). Uso: limpieza y transformación de datos antes de entrenar modelos.
 
 /src/modulos/entrenar_modelos.py: carga encuestas_limpio.csv, crea variables objetivo (valoracion y mejora_molestias), define preprocesador (OneHot para categóricas + passthrough numéricas) y entrena dos pipelines RandomForest: uno de regresión para predicción de satisfacción (modelo_satisfaccion.pkl) y otro clasificatorio para probabilidad de mejora de molestias (modelo_mejoras.pkl). Uso: generar y guardar modelos que el recomendador usa para puntuar colchones.
@@ -248,24 +257,31 @@ Salida esperada:
 - `modelo_mejoras.pkl`
 - Mensajes por consola indicando progreso y guardado de modelos.
 
-### Funcionamiento de la tool recomendar:
+### Funcionamiento de la tool recomendar
 Carga inicial: cargar_datos_al_inicio() carga encuestas_limpio.csv en datos_sistema["catalogo_csv"] y el pipeline modelo_satisfaccion.pkl en datos_sistema["modelo"].
 
 Cuando el router decide RECOMENDADOR: en chat_endpoint se asigna la herramienta tool.recomendar y la petición se envía al LLM con tools/tool_choice="auto". Si el LLM emite una tool-call, el backend la procesa.
 
 Invocación de la lógica ML (recomendar_colchon → logica_recomendar_colchon(args)):
     - Validación: comprueba que datos_sistema["catalogo_csv"] y datos_sistema["modelo"] estén cargados; si no, devuelve error técnico.
+
     - Construcción del perfil: toma una fila base del CSV y sobrescribe campos con los args del usuario (sexo, altura, peso, duerme_en_pareja, molestias_antes), calcula imc.
+
     - Filtrado opcional: si viene material_preferido, filtra catalogo_csv por nucleo (regex sobre strings).
+
     - Preparación de features: rellena en todas las filas candidatas las columnas necesarias (sexo, altura, peso, imc, duerme_en_pareja, molestias_antes, más nucleo, grosor, firmeza) para que el pipeline acepte la entrada.
+
     - Predicción: llama modelo.predict(X_pred[features]) (el modelo es el pipeline preprocesador+RandomForest entrenado en entrenar_modelos.py) y escribe score para cada candidato.
+
     - Ordenado y emparejado: ordena por score, toma los mejores (hasta 3), empareja cod_articulo con el feed XML (datos_sistema["feed_xml"]) — búsqueda exacta o por patrón — y construye HTML de salida con generar_html_tarjeta.
+
     - Salida: devuelve HTML con los candidatos o mensajes de fallo (sin stock, sin modelos, etc.).
+
     - Entrega al LLM y persistencia: la salida de la tool se añade a messages como rol tool; el servidor hace otra llamada al LLM para obtener la respuesta_final (que normalmente incorpora/copiará el HTML tal cual) y luego guarda la interacción con guardar_interaccion().
 
 ---
 
-### Funcionamiento de la tool consultar_ficha (esta herramienta recibe el contenido de la URL de ficha que está en ese momento visualizando el usuario para tenerlo como base de texto a la hora de dar las respuestas):
+### Funcionamiento de la tool consultar_ficha
 
 - Punto de invocación:
 Se activa cuando el enrutador clasifica la conversación como FICHA_PRODUCTO y el LLM genera una tool-call con consultar_producto_actual. En chat_endpoint se detecta esa tool-call y se llama a logica_consultar_producto_actual(input_data.html_contenido).
@@ -275,11 +291,14 @@ html_input (opcional): HTML completo que envía el frontend en html_contenido de
 
 - Determina qué HTML procesar:
     Si html_input existe y su longitud supera el umbral (en el código actual: len(html_input) > 100), usa directamente ese HTML.
+
     Si no, hace un fallback: descarga la página URL_FALLBACK_TEST mediante requests y usa su HTML (o devuelve un error si no puede cargarla).
+
     Llama a parsear_html_a_markdown(html_a_procesar) (función de parser_markdown.py) para:
-    Extraer la sección principal de la ficha (p. ej. contenedor id="centro" o fallback),
-    Eliminar scripts/estilos y ruido,
-    Convertir el contenido relevante a texto estructurado / Markdown-like legible por el LLM.
+
+     Extraer la sección principal de la ficha (p. ej. contenedor id="centro" o fallback),
+     Eliminar scripts/estilos y ruido,
+     Convertir el contenido relevante a texto estructurado / Markdown-like legible por el LLM.
     
 - Salida y uso posterior:
 El string devuelto se inserta en messages como respuesta de la tool (rol tool) y luego el backend hace otra llamada al LLM para generar la respuesta_final visible al usuario. El LLM suele usar ese texto/Markdown como contexto para contestar preguntas concretas sobre la ficha.
@@ -296,11 +315,17 @@ El string devuelto se inserta en messages como respuesta de la tool (rol tool) y
 
 - Flujo interno:
     Obtiene el índice del catálogo en memoria: feed = datos_sistema["feed_xml"].
+
     Normaliza keywords a minúsculas y las divide con .split() en tokens.
+    
     Búsqueda estricta (AND): recorre cada item del feed y construye texto = (item['titulo'] + " " + item['descripcion']).lower(); añade el item a resultados si todos los tokens están presentes en texto.
+
     Si no hay resultados, hace una búsqueda laxa (OR): añade item si cualquiera de los tokens aparece en texto.
+
     Si sigue sin resultados devuelve el mensaje: "He buscado en el catálogo y no he encontrado productos con esa descripción exacta."
+
     Si hay resultados, construye una cadena HTML de salida con un encabezado y hasta 3 tarjetas (generar_html_tarjeta(item, "")) para los primeros resultados y la devuelve.
+
 
 - Salida:
     Cadena HTML con lista de productos (máx. 3) o mensaje de "no encontrado". El HTML incluye enlaces y texto formateado por generar_html_tarjeta.
@@ -311,4 +336,5 @@ El string devuelto se inserta en messages como respuesta de la tool (rol tool) y
 ---
 
 #### Videos de demostración
+[Video de demostración general del chatbot de Colchones.es por Jose Antonio Gil García](videos/app_demo.mp4)
 [Video de demostración del sistema RAG por Vicente Vicedo](videos/rag_demo.mp4)
