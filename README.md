@@ -43,7 +43,23 @@ Debido a la coincidencia con el periodo navideño, la implementación de estos t
 
 > [!TIP]
 > **Ampliación potencial:** Si el tiempo lo permite, se valorará ampliar el alcance con un sistema de enrutado o **agentes** capaces de cubrir más tipos de preguntas y operar con datos estructurados de todo el catálogo, y no solo con la ficha que el usuario esté visualizando en ese momento.
+---
 
+
+## Descripción General
+
+- Propósito: Sistema backend que ofrece un asistente conversacional especializado en productos de descanso, combinando clasificación de intención, herramientas específicas (recomendador, buscador, lector de ficha) y recuperación documental (RAG) para respuestas fundamentadas.
+
+- Arquitectura: un API en FastAPI actúa como orquestador: recibe la petición del cliente, usa un clasificador LLM para decidir la intención, permite que el LLM pida herramientas (tool-calls) y ejecuta esas herramientas en el servidor (ML, búsqueda XML, parser de ficha, RAG). Finalmente, vuelve a llamar al LLM para componer la respuesta final.
+
+- Datos y ML: existe un pipeline ML (preprocesado + RandomForest) entrenado con encuestas para puntuar candidatos y generar recomendaciones; los modelos y el CSV limpio se cargan al iniciar el servicio y son utilizados por la herramienta de recomendación.
+
+- Interacción LLM ↔ Herramientas: el LLM puede generar una tool-call; el backend ejecuta la tool (sin enviar datos sensibles al LLM), añade la respuesta de la tool al historial como rol tool y solicita al LLM la respuesta final (HTML listo para mostrar).
+
+- Seguridad y operativa: acceso por x-api-key, persistencia de interacciones en BD para contexto, y uso de un vectorstore/RAG para preguntas generales sobre la tienda.
+Ejemplo de consulta dentro de una ficha de producto
+
+---
 
 ## RAG
 ### Objetivo
@@ -188,5 +204,111 @@ async def get_context_rag_endpoint(input_data: GetContextInput, api_key: str = S
 
 ![](imgs/rag4.png)
 
-#### Video de demostración
-[Video de demostración del sistema RAG](videos/rag_demo.mp4)
+---
+
+### Explicación del Modelo de Recomendación (ML):
+/src/modulos/preparar_encuestas.py: procesa el CSV original encuestas_colchones.csv, normaliza columnas, extrae filas por persona (mujer/hombre) y genera un CSV limpio encuestas_limpio.csv con features útiles (sexo, altura, peso, imc, nucleo, grosor, firmeza, valoracion, molestias antes/después, duerme_en_pareja). Uso: limpieza y transformación de datos antes de entrenar modelos.
+
+/src/modulos/entrenar_modelos.py: carga encuestas_limpio.csv, crea variables objetivo (valoracion y mejora_molestias), define preprocesador (OneHot para categóricas + passthrough numéricas) y entrena dos pipelines RandomForest: uno de regresión para predicción de satisfacción (modelo_satisfaccion.pkl) y otro clasificatorio para probabilidad de mejora de molestias (modelo_mejoras.pkl). Uso: generar y guardar modelos que el recomendador usa para puntuar colchones.
+
+Nota: los scripts usan `pandas`, `numpy`, `scikit-learn` y `joblib`.
+
+Ficheros relevantes
+- `encuestas_colchones.csv` — CSV raw con las encuestas (input).
+- `preparar_encuestas.py` — script que limpia y transforma `encuestas_colchones.csv` generando `encuestas_limpio.csv`.
+- `entrenar_modelos.py` — carga `encuestas_limpio.csv`, entrena dos modelos (satisfacción y mejora de molestias) y guarda:
+  - `modelo_satisfaccion.pkl`
+  - `modelo_mejoras.pkl`
+
+Instrucciones (paso a paso)
+1. Colocarse en el directorio del módulo (opcional, los scripts usan paths relativos):
+
+```bash
+cd src/modulos
+```
+
+2. Generar el CSV limpio desde el CSV original
+
+```bash
+python preparar_encuestas.py
+```
+
+Salida esperada:
+- `encuestas_limpio.csv` (archivo CSV generado en `src/modulos`).
+- Logs por consola indicando número de filas.
+
+3. Entrenar los modelos
+
+```bash
+python entrenar_modelos.py
+```
+
+Salida esperada:
+- `modelo_satisfaccion.pkl`
+- `modelo_mejoras.pkl`
+- Mensajes por consola indicando progreso y guardado de modelos.
+
+### Funcionamiento de la tool recomendar:
+Carga inicial: cargar_datos_al_inicio() carga encuestas_limpio.csv en datos_sistema["catalogo_csv"] y el pipeline modelo_satisfaccion.pkl en datos_sistema["modelo"].
+
+Cuando el router decide RECOMENDADOR: en chat_endpoint se asigna la herramienta tool.recomendar y la petición se envía al LLM con tools/tool_choice="auto". Si el LLM emite una tool-call, el backend la procesa.
+
+Invocación de la lógica ML (recomendar_colchon → logica_recomendar_colchon(args)):
+    - Validación: comprueba que datos_sistema["catalogo_csv"] y datos_sistema["modelo"] estén cargados; si no, devuelve error técnico.
+    - Construcción del perfil: toma una fila base del CSV y sobrescribe campos con los args del usuario (sexo, altura, peso, duerme_en_pareja, molestias_antes), calcula imc.
+    - Filtrado opcional: si viene material_preferido, filtra catalogo_csv por nucleo (regex sobre strings).
+    - Preparación de features: rellena en todas las filas candidatas las columnas necesarias (sexo, altura, peso, imc, duerme_en_pareja, molestias_antes, más nucleo, grosor, firmeza) para que el pipeline acepte la entrada.
+    - Predicción: llama modelo.predict(X_pred[features]) (el modelo es el pipeline preprocesador+RandomForest entrenado en entrenar_modelos.py) y escribe score para cada candidato.
+    - Ordenado y emparejado: ordena por score, toma los mejores (hasta 3), empareja cod_articulo con el feed XML (datos_sistema["feed_xml"]) — búsqueda exacta o por patrón — y construye HTML de salida con generar_html_tarjeta.
+    - Salida: devuelve HTML con los candidatos o mensajes de fallo (sin stock, sin modelos, etc.).
+    - Entrega al LLM y persistencia: la salida de la tool se añade a messages como rol tool; el servidor hace otra llamada al LLM para obtener la respuesta_final (que normalmente incorpora/copiará el HTML tal cual) y luego guarda la interacción con guardar_interaccion().
+
+---
+
+### Funcionamiento de la tool consultar_ficha (esta herramienta recibe el contenido de la URL de ficha que está en ese momento visualizando el usuario para tenerlo como base de texto a la hora de dar las respuestas):
+
+- Punto de invocación:
+Se activa cuando el enrutador clasifica la conversación como FICHA_PRODUCTO y el LLM genera una tool-call con consultar_producto_actual. En chat_endpoint se detecta esa tool-call y se llama a logica_consultar_producto_actual(input_data.html_contenido).
+
+- Entrada:
+html_input (opcional): HTML completo que envía el frontend en html_contenido del payload /chat.
+
+- Determina qué HTML procesar:
+    Si html_input existe y su longitud supera el umbral (en el código actual: len(html_input) > 100), usa directamente ese HTML.
+    Si no, hace un fallback: descarga la página URL_FALLBACK_TEST mediante requests y usa su HTML (o devuelve un error si no puede cargarla).
+    Llama a parsear_html_a_markdown(html_a_procesar) (función de parser_markdown.py) para:
+    Extraer la sección principal de la ficha (p. ej. contenedor id="centro" o fallback),
+    Eliminar scripts/estilos y ruido,
+    Convertir el contenido relevante a texto estructurado / Markdown-like legible por el LLM.
+    
+- Salida y uso posterior:
+El string devuelto se inserta en messages como respuesta de la tool (rol tool) y luego el backend hace otra llamada al LLM para generar la respuesta_final visible al usuario. El LLM suele usar ese texto/Markdown como contexto para contestar preguntas concretas sobre la ficha.
+
+---
+
+### Funcionamiento de la tool buscar_accesorios
+
+- Punto de invocación:
+    Se activa cuando el enrutador clasifica la interacción como BUSCADOR y el LLM genera una tool-call con la función buscar_accesorios_xml. En chat_endpoint se detecta la tool-call y se ejecuta logica_buscar_accesorios(args).
+
+- Entrada:
+    args con clave keywords: una cadena de texto con palabras clave (ej.: "almohada visco").
+
+- Flujo interno:
+    Obtiene el índice del catálogo en memoria: feed = datos_sistema["feed_xml"].
+    Normaliza keywords a minúsculas y las divide con .split() en tokens.
+    Búsqueda estricta (AND): recorre cada item del feed y construye texto = (item['titulo'] + " " + item['descripcion']).lower(); añade el item a resultados si todos los tokens están presentes en texto.
+    Si no hay resultados, hace una búsqueda laxa (OR): añade item si cualquiera de los tokens aparece en texto.
+    Si sigue sin resultados devuelve el mensaje: "He buscado en el catálogo y no he encontrado productos con esa descripción exacta."
+    Si hay resultados, construye una cadena HTML de salida con un encabezado y hasta 3 tarjetas (generar_html_tarjeta(item, "")) para los primeros resultados y la devuelve.
+
+- Salida:
+    Cadena HTML con lista de productos (máx. 3) o mensaje de "no encontrado". El HTML incluye enlaces y texto formateado por generar_html_tarjeta.
+
+    args: {"keywords": "almohada visco"}
+    salida esperada: HTML con hasta 3 productos cuyo título/descr contengan "almohada" y/o "visco" según la búsqueda AND/OR.
+
+---
+
+#### Videos de demostración
+[Video de demostración del sistema RAG por Vicente Vicedo](videos/rag_demo.mp4)
