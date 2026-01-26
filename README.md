@@ -173,7 +173,7 @@ if name == "buscar_info_general":
 Si la consulta generada tiene una fuente asociada, se incluye en el prompt para que el modelo de lenguaje pueda indicársela al usuario en la respuesta.
 
 Para probar los documentos recuperados, se ha habilitado un endpoint RESTful que permite enviar preguntas y recibir respuestas en formato JSON y ver los documentos recuperados con las fuentes asociadas.
-```
+```python
 class GetContextInput(BaseModel):
     message: str
 
