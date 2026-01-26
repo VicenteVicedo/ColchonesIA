@@ -338,4 +338,8 @@ El string devuelto se inserta en messages como respuesta de la tool (rol tool) y
 #### Videos de demostración
 [Video de demostración general del chatbot de Colchones.es por Jose Antonio Gil García](videos/app_demo.mp4)
 
-[Video de demostración del sistema RAG por Vicente Vicedo](videos/rag_demo.mp4)
+[Video de demostración del sistema RAG por Vicente Vicedo (descargar vídeo)](videos/rag_demo.mp4)
+
+Enlace Youtube demostración de RAG por Vicente Vicedo:
+
+[![Video de demostración del sistema RAG por Vicente Vicedo](https://img.youtube.com/vi/ds1-VmY4los/0.jpg)](https://youtu.be/ds1-VmY4los)
