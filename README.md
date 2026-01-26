@@ -344,4 +344,6 @@ Enlace Youtube demostración de RAG por Vicente Vicedo:
 
 [![Video de demostración del sistema RAG por Vicente Vicedo](https://img.youtube.com/vi/ds1-VmY4los/0.jpg)](https://youtu.be/ds1-VmY4los)
 
+---
+
 URL DONDE PROBAR EL CHATBOT: https://www.colchones.es/colchones/Farmaflex-Medifarm-Aquacell-viscoagua-topper-climatizado-certificado-medico/
