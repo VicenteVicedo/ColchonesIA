@@ -186,6 +186,7 @@ async def get_context_rag_endpoint(input_data: GetContextInput, api_key: str = S
     return {"context": contexto_rag, "sources": sources}
 ```
 
+![](imgs/rag4.png)
 
 #### Video de demostración
 [Video de demostración del sistema RAG](videos/rag_demo.mp4)
