@@ -263,21 +263,21 @@ Carga inicial: cargar_datos_al_inicio() carga encuestas_limpio.csv en datos_sist
 Cuando el router decide RECOMENDADOR: en chat_endpoint se asigna la herramienta tool.recomendar y la petición se envía al LLM con tools/tool_choice="auto". Si el LLM emite una tool-call, el backend la procesa.
 
 Invocación de la lógica ML (recomendar_colchon → logica_recomendar_colchon(args)):
-    - Validación: comprueba que datos_sistema["catalogo_csv"] y datos_sistema["modelo"] estén cargados; si no, devuelve error técnico.
+- Validación: comprueba que datos_sistema["catalogo_csv"] y datos_sistema["modelo"] estén cargados; si no, devuelve error técnico.
 
-    - Construcción del perfil: toma una fila base del CSV y sobrescribe campos con los args del usuario (sexo, altura, peso, duerme_en_pareja, molestias_antes), calcula imc.
+- Construcción del perfil: toma una fila base del CSV y sobrescribe campos con los args del usuario (sexo, altura, peso, duerme_en_pareja, molestias_antes), calcula imc.
 
-    - Filtrado opcional: si viene material_preferido, filtra catalogo_csv por nucleo (regex sobre strings).
+- Filtrado opcional: si viene material_preferido, filtra catalogo_csv por nucleo (regex sobre strings).
 
-    - Preparación de features: rellena en todas las filas candidatas las columnas necesarias (sexo, altura, peso, imc, duerme_en_pareja, molestias_antes, más nucleo, grosor, firmeza) para que el pipeline acepte la entrada.
+- Preparación de features: rellena en todas las filas candidatas las columnas necesarias (sexo, altura, peso, imc, duerme_en_pareja, molestias_antes, más nucleo, grosor, firmeza) para que el pipeline acepte la entrada.
 
-    - Predicción: llama modelo.predict(X_pred[features]) (el modelo es el pipeline preprocesador+RandomForest entrenado en entrenar_modelos.py) y escribe score para cada candidato.
+- Predicción: llama modelo.predict(X_pred[features]) (el modelo es el pipeline preprocesador+RandomForest entrenado en entrenar_modelos.py) y escribe score para cada candidato.
 
-    - Ordenado y emparejado: ordena por score, toma los mejores (hasta 3), empareja cod_articulo con el feed XML (datos_sistema["feed_xml"]) — búsqueda exacta o por patrón — y construye HTML de salida con generar_html_tarjeta.
+- Ordenado y emparejado: ordena por score, toma los mejores (hasta 3), empareja cod_articulo con el feed XML (datos_sistema["feed_xml"]) — búsqueda exacta o por patrón — y construye HTML de salida con generar_html_tarjeta.
 
-    - Salida: devuelve HTML con los candidatos o mensajes de fallo (sin stock, sin modelos, etc.).
+- Salida: devuelve HTML con los candidatos o mensajes de fallo (sin stock, sin modelos, etc.).
 
-    - Entrega al LLM y persistencia: la salida de la tool se añade a messages como rol tool; el servidor hace otra llamada al LLM para obtener la respuesta_final (que normalmente incorpora/copiará el HTML tal cual) y luego guarda la interacción con guardar_interaccion().
+- Entrega al LLM y persistencia: la salida de la tool se añade a messages como rol tool; el servidor hace otra llamada al LLM para obtener la respuesta_final (que normalmente incorpora/copiará el HTML tal cual) y luego guarda la interacción con guardar_interaccion().
 
 ---
 
