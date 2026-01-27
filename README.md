@@ -64,8 +64,6 @@ Debido a la coincidencia con el periodo navideño, la implementación de estos t
 
 - Seguridad y operativa: acceso por x-api-key, persistencia de interacciones en BD para contexto, y uso de un vectorstore/RAG para preguntas generales sobre la tienda.
 
-Ejemplo de consulta dentro de una ficha de producto
-
 ![Imagen del funcionamiento](imgs/funcionamietno.png)
 
 ---
