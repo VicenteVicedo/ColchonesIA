@@ -12,6 +12,7 @@ import requests
 import xml.etree.ElementTree as ET
 import traceback
 import re
+import unicodedata
 from dotenv import load_dotenv
 from parser_markdown import parsear_html_a_markdown
 from rag.src.colchones_rag import get_context_embeddings
@@ -93,14 +94,6 @@ cargar_datos_al_inicio()
 
 
 # ==========================================
-# 2. DEFINICIÓN DE TOOLS (SEPARADAS)
-# ==========================================
-
-
-
-
-
-# ==========================================
 # 3. LÓGICA PYTHON (Generadores de HTML)
 # ==========================================
 
@@ -113,11 +106,29 @@ def generar_html_tarjeta(item, razon):
     # 2. GENERACIÓN HTML
     return f"""
     <p class="razon">
-        <a href="{link_limpio}" target="_blank">{titulo_limpio} ({item['id']})</a> ({razon})
+        <a href="{link_limpio}" target="_blank">{titulo_limpio}</a> ({razon})
+    </p>
+    """
+# ==========================================
+# 3. LÓGICA PYTHON (Generadores de HTML)
+# ==========================================
+
+def generar_html_tarjeta_buscador(item):
+    # 1. LIMPIEZA DE URL (Sanitización)
+    print(f"Producto encontrado: {item['titulo']}")
+    # Quitamos espacios, saltos de línea (\n) y posibles etiquetas <br> que se hayan colado
+    link_limpio = item['link'].strip().replace('\n', '').replace('\r', '').replace('<br>', '').replace(' ', '')
+    titulo_limpio = item['titulo'].strip().replace('\n', '').replace('\r', '').replace('<br>', '').replace(' ', '')
+    descripcion = item['descripcion'].strip().replace('\n', '').replace('\r', '').replace('<br>', '').replace(' ', '')
+    
+    # 2. GENERACIÓN HTML
+    return f"""
+    <p class="razon">
+        <a href="{link_limpio}" target="_blank">{titulo_limpio}</a> {descripcion}
     </p>
     """
 
-def logica_recomendar_colchon(args):
+def logica_recomendar_colchon(args, user_id):
     """CEREBRO MATEMÁTICO (Solo Colchones)"""
     df = datos_sistema["catalogo_csv"]
     modelo = datos_sistema["modelo"]
@@ -182,43 +193,99 @@ def logica_recomendar_colchon(args):
                 ids_usados.add(match_key)
 
         if encontrados == 0:
-            return "Lo siento, he encontrado modelos ideales para ti, pero **no tenemos stock online** de esas referencias exactas ahora mismo."
+            return f"Lo siento, <b>no he encontrado modelos</b> ideales para ti, puedes dejarnos un correo o teléfono para poder contactar contigo: <div class='bloqueLeadChati'><input type='text' placeholder='Correo o teléfono' style='width:85%; padding:8px;' name='telefonoCorreoCliente' id='telefonoCorreoCliente'/><input type='hidden' name='cookieUsuario' id='cookieUsuario' value='{user_id}'/><input type='hidden' name='articuloVisitado' id='articuloVisitado' value=''/><button type='button' style='padding: 10px 9px;    cursor: pointer;    background: #4c9b9d;    float: right;    border: solid 1px #4c9b9d;' onclick='enviarContactoChati()' id='botonEnviarContactoChati'><img src='https://cdn-icons-png.flaticon.com/512/60/60525.png' alt='Enviar' style='width:16px; height:16px; vertical-align:middle;filter: brightness(0) invert(1);'></button></div>"
 
         return html_output
 
     except Exception as e:
         traceback.print_exc()
-        return "Error calculando colchón."
+        return f"Lo siento, <b>no he encontrado modelos</b> ideales para ti, puedes dejarnos un correo o teléfono para poder contactar contigo: <div class='bloqueLeadChati'><input type='text' placeholder='Correo o teléfono' style='width:85%; padding:8px;' name='telefonoCorreoCliente' id='telefonoCorreoCliente'/><input type='hidden' name='cookieUsuario' id='cookieUsuario' value='{user_id}'/><input type='hidden' name='articuloVisitado' id='articuloVisitado' value=''/><button type='button' style='padding: 10px 9px;    cursor: pointer;    background: #4c9b9d;    float: right;    border: solid 1px #4c9b9d;' onclick='enviarContactoChati()' id='botonEnviarContactoChati'><img src='https://cdn-icons-png.flaticon.com/512/60/60525.png' alt='Enviar' style='width:16px; height:16px; vertical-align:middle;filter: brightness(0) invert(1);'></button></div>"
 
-def logica_buscar_accesorios(args):
-    """CEREBRO BUSCADOR (Keywords en XML)"""
+def logica_buscar_accesorios(args, user_id):
+    """
+    CEREBRO BUSCADOR MEJORADO (Búsqueda por Puntuación/Weighted Search)
+    """
     feed = datos_sistema["feed_xml"]
-    keywords = args.get('keywords', '').lower().split()
-    resultados = []
-    
-    # Búsqueda estricta (AND)
+    raw_keywords = args.get('keywords', '').lower().split()
+
+    # 1. DEFINIR STOP WORDS (Palabras a ignorar para reducir ruido)
+    stop_words = {'de', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o', 'para', 'con', 'en'}
+    keywords = [kw for kw in raw_keywords if kw not in stop_words and len(kw) > 2]
+
+    if not keywords:
+         # Si después de limpiar no quedan keywords (ej: el usuario solo puso "de la"), usar las originales
+         keywords = raw_keywords
+
+    # --- FUNCIÓN AUXILIAR PARA QUITAR ACENTOS ---
+    def normalizar_texto(texto):
+        if not texto: return ""
+        # Esto transforma "Colchón Viscoelástico" en "colchon viscoelastico"
+        return ''.join(c for c in unicodedata.normalize('NFD', texto.lower())
+                       if unicodedata.category(c) != 'Mn')
+    # -------------------------------------------
+
+    resultados_con_puntuacion = []
+
+    # 2. BÚSQUEDA CON PUNTUACIÓN
     for item in feed.values():
-        texto = (item['titulo'] + " " + item['descripcion']).lower()
-        if all(kw in texto for kw in keywords):
-            resultados.append(item)
+        score = 0
+        coincidencias_palabras = 0
+        
+        # Normalizamos textos del XML una vez
+        titulo_norm = normalizar_texto(item['titulo'])
+        descripcion_norm = normalizar_texto(item.get('descripcion', '')) # Usamos get por si no hay descripción
+
+        for kw in keywords:
+            kw_norm = normalizar_texto(kw)
+            palabra_encontrada = False
+
+            # REGLA 1: El título vale mucho más (x5 veces más que la descripción)
+            if kw_norm in titulo_norm:
+                score += 10
+                palabra_encontrada = True
+            
+            # REGLA 2: La descripción vale menos, pero suma
+            # Usamos 'elif' para no sumar doble si está en los dos sitios por la misma palabra
+            elif kw_norm in descripcion_norm:
+                score += 2
+                palabra_encontrada = True
+            
+            if palabra_encontrada:
+                coincidencias_palabras += 1
+
+        # REGLA 3: Bonus enorme si encontramos TODAS las palabras buscadas
+        # Esto recupera el comportamiento "estricto" pero lo prioriza en lugar de filtrar.
+        if coincidencias_palabras == len(keywords) and len(keywords) > 0:
+            score += 30
+
+        # Si el producto tiene alguna relevancia, lo guardamos
+        if score > 0:
+            # Guardamos una tupla: (puntuación, objeto_item)
+            resultados_con_puntuacion.append((score, item))
+
+    # 3. ORDENAR RESULTADOS POR PUNTUACIÓN DESCENDENTE (Mayor puntuación primero)
+    # x[0] es el score
+    resultados_con_puntuacion.sort(key=lambda x: x[0], reverse=True)
+
+    # Extraemos solo los items ya ordenados
+    resultados_finales = [item for score, item in resultados_con_puntuacion]
+
+    # 4. GENERACIÓN DE RESPUESTA (Igual que antes)
+    if not resultados_finales:
+        # Usamos f-string aquí también por si acaso
+        return f"He buscado en el catálogo y <b>no he encontrado productos</b> con esa descripción. Puedes dejarnos un correo o teléfono para poder contactar contigo: <div class='bloqueLeadChati'><input type='text' placeholder='Correo o teléfono' style='width:85%; padding:8px;' name='telefonoCorreoCliente' id='telefonoCorreoCliente'/><input type='hidden' name='cookieUsuario' id='cookieUsuario' value='{user_id}'/><input type='hidden' name='articuloVisitado' id='articuloVisitado' value=''/><button type='button' style='padding: 10px 9px; cursor: pointer; background: #4c9b9d; float: right; border: solid 1px #4c9b9d;' onclick='enviarContactoChati()' id='botonEnviarContactoChati'><img src='https://cdn-icons-png.flaticon.com/512/60/60525.png' alt='Enviar' style='width:16px; height:16px; vertical-align:middle;filter: brightness(0) invert(1);'></button></div>"
+
+    html_output = f"Aquí tienes los resultados más relevantes para '{' '.join(raw_keywords)}':<br><br>"
     
-    # Búsqueda laxa (OR) si no hay resultados
-    if not resultados:
-        for item in feed.values():
-            texto = (item['titulo'] + " " + item['descripcion']).lower()
-            if any(kw in texto for kw in keywords):
-                resultados.append(item)
-
-    if not resultados:
-        return "He buscado en el catálogo y **no he encontrado productos** con esa descripción exacta."
-
-    html_output = f"Aquí tienes lo que he encontrado para '{' '.join(keywords)}':<br><br>"
-    for item in resultados[:3]:
-        html_output += generar_html_tarjeta(item, "")
+    # Mostramos el top 3
+    for item in resultados_finales[:3]:
+        # Opcional: Puedes mostrar la puntuación para depurar:
+        # html_output += generar_html_tarjeta(item, f"Relevancia: Alta") 
+        html_output += generar_html_tarjeta_buscador(item)
         
     return html_output
 
-def logica_consultar_producto_actual(html_input):
+def logica_consultar_producto_actual(html_input, user_id):
     """
     CEREBRO LECTOR (Parser de Ficha)
     Recibe HTML -> Limpia -> Markdown -> OpenAI
@@ -250,20 +317,44 @@ def logica_consultar_producto_actual(html_input):
 # 4. ROUTER (CLASIFICADOR)
 # ==========================================
 
-def enrutador_intenciones(mensaje, tiene_html):
-    prompt = f"""
-    Eres un clasificador de intenciones para el e-commerce Colchones.es.
-    Tu trabajo es filtrar lo que entra al chat.
-    1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestiasdolores, etc).
-    2. 'BUSCADOR': Busca almohadas, canapés, somieres, bases tapizdas, ropa de cama o una marca específica.
-    3. 'FICHA_PRODUCTO': Pregunta detalles del producto que ve en pantalla {'(Tiene ficha abierta)' if tiene_html else '(NO tiene ficha)'}.
-    4. 'GENERAL': Saludos, envíos, devoluciones, garantías.
-   
-    CATEGORÍA DE BLOQUEO:
-    5. 'OFF_TOPIC': El usuario pregunta sobre política, deportes, religión, cocina, matemáticas, programación, famosos, clima o CUALQUIER TEMA que no sea descanso o relacionado con un ecommerce de colchones.es.
-
-    Mensaje: "{mensaje}"
-    Responde SOLO con la categoría (ej: OFF_TOPIC):"""
+def enrutador_intenciones(mensaje, tiene_html, esta_en_ficha, historial):
+    print(f"Enrutador: {tiene_html}")
+    contexto_para_router = formatear_historial_para_router(historial, ultimos_n=3)
+    if tiene_html:
+        prompt = f"""
+        Eres un clasificador de intenciones para el e-commerce Colchones.es.
+        Tu trabajo es filtrar lo que entra al chat.
+        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias, dolores, etc).
+        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas, ropa de cama. USALA solo si la intención es devolver un listado de productos o una caracteristica de algun producto concreto.
+        3. 'FICHA_PRODUCTO': El usuario Pregunta detalles del producto que ve en pantalla (caracteristicas, precio de alguna medida, plazos de entrega, opiniones, fabricacion. Si crees que la pregunta en el contexto hace referencia al producto actual que está viendo el cliente prioriza esta información: {esta_en_ficha} .
+        4. 'GENERAL': Saludos, envíos, devoluciones, garantías y temas relacionados con estas keywords (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias,rebajas-ofertas-descuentos-promociones,firmeza-del-colchon,medidas-de-colchones,tipos-de-colchones,colchones-estilos-de-vida,consejos-colchon-latex,consejos-colchon-viscoelastica,consejos-limpiar-cambiar-colchon,como-elegir-un-colchon-y-base/composicion-somier-laminas,como-elegir-un-colchon-y-base/estructura-canapes-y-tapas,como-elegir-un-colchon-y-base/sistemas-apertura-canapes,informacion-fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado,)
+        5. 'GENERAL_MARCA': si el usuario pregunta por nuestras marcas de manera générica.
+       
+        CATEGORÍA DE BLOQUEO:
+        6. 'OFF_TOPIC': El usuario pregunta sobre política, deportes, religión, cocina, matemáticas, programación, famosos, clima o CUALQUIER TEMA que no sea descanso o relacionado con un ecommerce de colchones.es.
+        ---
+        CONTEXTO PREVIO (Últimos mensajes):
+        {contexto_para_router}
+        ---
+        MENSAJE ACTUAL DEL USUARIO: "{mensaje}"
+        ---
+        Responde SOLO con la categoría (ej: OFF_TOPIC):"""       
+    else:
+        prompt = f"""
+        Eres un clasificador de intenciones para el e-commerce Colchones.es.
+        Tu trabajo es filtrar lo que entra al chat.
+        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias, dolores, etc).
+        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas,  ropa de cama o una marca específica.        
+        3. 'GENERAL': Saludos, envíos, devoluciones, garantías y temas relacionados con estas keywords (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias,rebajas-ofertas-descuentos-promociones,firmeza-del-colchon,medidas-de-colchones,tipos-de-colchones,colchones-estilos-de-vida,consejos-colchon-latex,consejos-colchon-viscoelastica,consejos-limpiar-cambiar-colchon,como-elegir-un-colchon-y-base/composicion-somier-laminas,como-elegir-un-colchon-y-base/estructura-canapes-y-tapas,como-elegir-un-colchon-y-base/sistemas-apertura-canapes,informacion-fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado,)
+        4. 'GENERAL_MARCA': si el usuario pregunta por nuestras marcas de manera générica.
+        5. 'OFF_TOPIC': El usuario pregunta sobre política, deportes, religión, cocina, matemáticas, programación, famosos, clima o CUALQUIER TEMA que no sea descanso o relacionado con un ecommerce de colchones.es.
+        ---
+        CONTEXTO PREVIO (Últimos mensajes):
+        {contexto_para_router}
+        ---
+        MENSAJE ACTUAL DEL USUARIO: "{mensaje}"
+        ---
+        Responde SOLO con la categoría (ej: OFF_TOPIC):"""
 
     try:
         resp = client.chat.completions.create(
@@ -302,6 +393,27 @@ def recuperar_historial(user_id, dominio):
     finally:
         if conn and conn.is_connected(): conn.close()
     return list(reversed(historial))
+
+def formatear_historial_para_router(historial_lista, ultimos_n=2):
+    """
+    Convierte los últimos N mensajes del historial en un string de texto plano
+    para dar contexto rápido al router.
+    Ej:
+    Asistente: ¿Cuánto mides?
+    Usuario: 1,90
+    """
+    if not historial_lista:
+        return "Sin contexto previo."
+        
+    # Tomamos solo los últimos N mensajes para no saturar al router
+    historial_reciente = historial_lista[-ultimos_n:]
+    
+    texto_contexto = ""
+    for msg in historial_reciente:
+        role = "Asistente" if msg['role'] == 'assistant' else "Usuario"
+        texto_contexto += f"{role}: {msg['content']}\n"
+    
+    return texto_contexto.strip()
 
 def guardar_interaccion(datos):
     conn = None
@@ -365,7 +477,9 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
 
     # 1. ENRUTAMIENTO
     tiene_html = bool(input_data.html_contenido and len(input_data.html_contenido) > 50)
-    intencion = enrutador_intenciones(input_data.message, tiene_html)
+    esta_en_ficha = input_data.nombre_producto
+    historial = recuperar_historial(input_data.user_id, input_data.dominio)
+    intencion = enrutador_intenciones(input_data.message, tiene_html, esta_en_ficha, historial)
     
     # --- NUEVO: BLOQUEO DE TEMAS ---
     if intencion == "OFF_TOPIC":
@@ -382,6 +496,38 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     # Definimos el SYSTEM PROMPT con una "Personalidad Restrictiva"
     sys_prompt = """Eres el asistente experto de Colchones.es. 
     TU ÚNICO PROPÓSITO es ayudar a los usuarios a dormir mejor y encontrar productos de descanso en la web de colchones.es.
+
+    RESTRICCIONES DE RESPUESTA
+    1. Siempre máximo 100 palabras.
+    2. Nunca inventes información.
+
+    ATENCIÓN AL CLIENTE
+    * L-V: 8 am - 20 pm
+    * Email: info@colchones.es
+    * WhatsApp: 657 657 780
+    * Teléfono: 900 701 086 (tel. gratuito)
+    
+    GLOSARIO DE TÉRMINOS
+    * “lamas” = láminas
+    * “visco” = viscoelástica (aunque aparezca con nombres de marca, equivale a viscoelástica con beneficios similares).
+    * “hr” = espumación HR
+    * “colores” o “terminaciones” en canapés = acabados (se ven en ficha/desplegable).
+    * “grueso” o “grosor” en colchones = altura (ej: 150x200x31 = 31 cm). A más grosor, más confort.
+    * “lateral” o “faldón” en ropa de cama = alto (ej: 90x180x27 → válido para colchones de hasta 27 cm).
+    * “colchones de muelles” = muelles tradicionales.
+    * "bases" = somier de láminas, canapé o base tapizada.
+    * “entresacados / embolsados / encastrados” = muelles ensacados.
+    * "firmeza" = dureza. Se refiere a una característica del producto.
+    * "firme" = duro.
+    * "durmientes" = personas
+    * "personas sudorosas, que sudan, con sudor" = personas calurosas
+    * "saco" = funda nórdica.
+    * Diferencia: muelles tradicionales (unidos) vs. muelles ensacados (independientes, mayor adaptabilidad).
+    * “tiempo de entrega” = plazo de entrega.
+    * "usar solo por una cara" = una cara útil
+    * "ficha fábrica" = ficha técnica
+    * "aguanta" = soporta
+
     
     REGLAS DE COMPORTAMIENTO:
     1. Si el usuario saluda, sé amable y profesional.
@@ -391,20 +537,23 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     if intencion == "RECOMENDADOR":
         tools_activas = [tool.recomendar]
         sys_prompt += "Tu objetivo es recomendar el colchón ideal. Pide peso y altura si faltan. Usa 'recomendar_colchon'."
-    elif intencion == "BUSCAR":
+    elif intencion == "BUSCADOR":
         tools_activas = [tool.buscar_accesorios]
-        sys_prompt += "Ayuda a encontrar accesorios o marcas. Usa 'buscar_accesorios_xml'."
+        sys_prompt += "Ayuda a encontrar productos o marcas. Usa 'buscar_accesorios_xml'."
     elif intencion == "FICHA_PRODUCTO":
         tools_activas = [tool.consultar_ficha]
-        sys_prompt += "Responde dudas sobre el producto que el usuario ve. Usa 'consultar_producto_actual' para leer sus datos."
+        sys_prompt += "Responde dudas sobre el producto que el usuario esta viendo en la web (te pasamos el contenido integro de la ficha de producto). Usa 'consultar_producto_actual' para leer sus datos."
+    elif intencion == "GENERAL_MARCA":
+        tools_activas = [tool.rag_datos_generales_tienda]
+        sys_prompt += "Responde dudas usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
     else:
         tools_activas = [tool.rag_datos_generales_tienda]
-        sys_prompt += "Responde dudas corporativas (envíos, garantías) usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
+        sys_prompt += "Responde dudas usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
     
     sys_prompt += """    
     INSTRUCCIONES DE FORMATO Y MAQUETACIÓN:
-    1. Tu respuesta se mostrará en una web, así que USA HTML para estructurar el texto.
-    2. NUNCA devuelvas un "muro de texto" denso. Se claro y conciso.
+    1. Tu respuesta se mostrará en una web, así que USA HTML para estructurar el texto y poner enlaces.
+    2. NUNCA devuelvas un "muro de texto" denso. Se claro y CONCISO.
     3. Si tienes que listar pasos, requisitos o puntos importantes, usa listas desordenadas HTML:
        <ul>
          <li><strong>Concepto clave:</strong> Explicación...</li>
@@ -422,7 +571,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     sys_prompt += "\nSimplemente escupe el HTML crudo que recibas."
 
     # 2. CHAT CON OPENAI
-    historial = recuperar_historial(input_data.user_id, input_data.dominio)
+    
     messages = [{"role": "system", "content": sys_prompt}] + historial + [{"role": "user", "content": input_data.message}]
 
     try:
@@ -442,19 +591,20 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         msg_ia = response.choices[0].message
         
         respuesta_final = ""
-
+       
         if msg_ia.tool_calls:
             tool_call = msg_ia.tool_calls[0]
             name = tool_call.function.name
+            print(f"El LLM ha elegido la herramienta: {name}")
             args = json.loads(tool_call.function.arguments)
             res_tool = ""
 
             if name == "recomendar_colchon":
-                res_tool = logica_recomendar_colchon(args)
+                res_tool = logica_recomendar_colchon(args, input_data.user_id)
             elif name == "buscar_accesorios_xml":
-                res_tool = logica_buscar_accesorios(args)
+                res_tool = logica_buscar_accesorios(args, input_data.user_id)
             elif name == "consultar_producto_actual":
-                res_tool = logica_consultar_producto_actual(input_data.html_contenido)
+                res_tool = logica_consultar_producto_actual(input_data.html_contenido, input_data.user_id)
             elif name == "buscar_info_general":
                 res_tool, _sources = get_context_embeddings(input_data.message)
                 if _sources:
@@ -466,6 +616,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
             final = client.chat.completions.create(model="gpt-4o", messages=messages)
             respuesta_final = final.choices[0].message.content
         else:
+            print("no usa herramientas")
             respuesta_final = msg_ia.content
 
         guardar_interaccion({

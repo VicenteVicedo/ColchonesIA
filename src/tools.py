@@ -22,7 +22,7 @@ buscar_accesorios = {
     "type": "function",
     "function": {
         "name": "buscar_accesorios_xml",
-        "description": "Busca almohadas, canapés, bases o ropa de cama por palabra clave.",
+        "description": "Busca colchones, almohadas, canapés, bases o ropa de cama por palabra clave.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -37,7 +37,7 @@ consultar_ficha = {
     "type": "function",
     "function": {
         "name": "consultar_producto_actual",
-        "description": "Lee la ficha técnica del producto que el usuario está viendo ahora mismo.",
+        "description": "Lee la ficha del producto que el usuario está viendo ahora mismo.",
         "parameters": {
             "type": "object", 
             "properties": {}, 
@@ -51,7 +51,7 @@ rag_datos_generales_tienda = {
     "type": "function",
     "function": {
         "name": "buscar_info_general",
-        "description": "Información general sobre la tienda de colchones (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias)",
+        "description": "Información general sobre la tienda de colchones (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias,rebajas-ofertas-descuentos-promociones,firmeza-del-colchon,medidas-de-colchones,tipos-de-colchones,colchones-estilos-de-vida,consejos-colchon-latex,consejos-colchon-viscoelastica,consejos-limpiar-cambiar-colchon,como-elegir-un-colchon-y-base/composicion-somier-laminas,como-elegir-un-colchon-y-base/estructura-canapes-y-tapas,como-elegir-un-colchon-y-base/sistemas-apertura-canapes,informacion-fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado)",
         "parameters": {
             "type": "object",
             "properties": {"pregunta": {"type": "string"}},
