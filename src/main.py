@@ -24,17 +24,17 @@ load_dotenv()
 API_KEY_NAME = "x-api-key"
 MI_CLAVE_SECRETA = os.getenv("MI_CLAVE_SECRETA")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-XML_URL = "https://www.colchones.es/gmerchantcenter_dofinder.xml"
+XML_URL = "https://www.colchones.es/gmerchantcenter_chati.xml"
 LOG_FILE = "agent_decisions.log"
 
 # URL para cuando probamos el bot fuera de la web (Postman, consola, etc.)
 URL_FALLBACK_TEST = "https://www.colchones.es/colchones/juvenil-First-Sac-muelles-ensacados-viscoelastica-fibras/"
 
 DB_CONFIG = {
-    'user': 'chati',
+    'user': os.getenv("DB_user"),
     'password': os.getenv("DB_PASSWORD_CHATI"),
-    'host': 'localhost',
-    'database': 'colchones',
+    'host': os.getenv("DB_host"),
+    'database': os.getenv("DB_database"),
     'raise_on_warnings': True
 }
 
@@ -290,6 +290,8 @@ def logica_consultar_producto_actual(html_input, user_id):
     CEREBRO LECTOR (Parser de Ficha)
     Recibe HTML -> Limpia -> Markdown -> OpenAI
     """
+
+  
     html_a_procesar = ""
 
     # A. Usar input del usuario
@@ -311,6 +313,7 @@ def logica_consultar_producto_actual(html_input, user_id):
 
     # Parsear a Markdown
     info_limpia = parsear_html_a_markdown(html_a_procesar)
+
     return f"--- FICHA TÉCNICA LEÍDA ---\n\n{info_limpia}"
 
 # ==========================================
@@ -324,9 +327,9 @@ def enrutador_intenciones(mensaje, tiene_html, esta_en_ficha, historial):
         prompt = f"""
         Eres un clasificador de intenciones para el e-commerce Colchones.es.
         Tu trabajo es filtrar lo que entra al chat.
-        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias, dolores, etc).
-        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas, ropa de cama. USALA solo si la intención es devolver un listado de productos o una caracteristica de algun producto concreto.
-        3. 'FICHA_PRODUCTO': El usuario Pregunta detalles del producto que ve en pantalla (caracteristicas, precio de alguna medida, plazos de entrega, opiniones, fabricacion. Si crees que la pregunta en el contexto hace referencia al producto actual que está viendo el cliente prioriza esta información: {esta_en_ficha} .
+        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias, dolores, etc) interpreta bien si la pregunta es ambigua o se refiere al producto visitado, si crees que hace referencia al producto visitado, usa la herramienta 'FICHA_PRODUCTO' .
+        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas, ropa de cama. También puedes consultar esta herramienta para conseguir URLs de producto si el usuario te lo pidiera. USALA solo si la intención es devolver un listado de productos, urls de producto o una caracteristica de algun producto concreto.
+        3. 'FICHA_PRODUCTO': El usuario Pregunta detalles del producto que ve en pantalla (caracteristicas, precio de alguna medida, plazos de entrega, opiniones, fabricacion, donde probarlo o donde comprarlo, si es recomendable este producto para el. Si crees que la pregunta en el contexto hace referencia al producto actual que está viendo el cliente es IMPORTANTE QUE PRIORICES esta información: {esta_en_ficha} .
         4. 'GENERAL': Saludos, envíos, devoluciones, garantías y temas relacionados con estas keywords (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias,rebajas-ofertas-descuentos-promociones,firmeza-del-colchon,medidas-de-colchones,tipos-de-colchones,colchones-estilos-de-vida,consejos-colchon-latex,consejos-colchon-viscoelastica,consejos-limpiar-cambiar-colchon,como-elegir-un-colchon-y-base/composicion-somier-laminas,como-elegir-un-colchon-y-base/estructura-canapes-y-tapas,como-elegir-un-colchon-y-base/sistemas-apertura-canapes,informacion-fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado,)
         5. 'GENERAL_MARCA': si el usuario pregunta por nuestras marcas de manera générica.
        
@@ -343,8 +346,8 @@ def enrutador_intenciones(mensaje, tiene_html, esta_en_ficha, historial):
         prompt = f"""
         Eres un clasificador de intenciones para el e-commerce Colchones.es.
         Tu trabajo es filtrar lo que entra al chat.
-        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias, dolores, etc).
-        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas,  ropa de cama o una marca específica.        
+        1. 'RECOMENDADOR': El usuario busca que le recomendemos un colchón (peso, altura, molestias).
+        2. 'BUSCADOR': Busca colchones (siempre que no pregunte sobre el colchon de la ficha que esté {esta_en_ficha}), almohadas, canapés, somieres, bases tapizdas, ropa de cama. También puedes consultar esta herramienta para conseguir URLs de producto si el usuario te lo pidiera. USALA solo si la intención es devolver un listado de productos, urls de producto o una caracteristica de algun producto concreto.      
         3. 'GENERAL': Saludos, envíos, devoluciones, garantías y temas relacionados con estas keywords (sobre-como-comprar, sobre-formas-de-pago, sobre-envio-recepcion-pedido, -atencion-cliente, como-dormir-bien, como-elegir-un-colchon-y-base, mejores-colchones-ocu-2025, compromisos de nuestra web, sobre-garantias,rebajas-ofertas-descuentos-promociones,firmeza-del-colchon,medidas-de-colchones,tipos-de-colchones,colchones-estilos-de-vida,consejos-colchon-latex,consejos-colchon-viscoelastica,consejos-limpiar-cambiar-colchon,como-elegir-un-colchon-y-base/composicion-somier-laminas,como-elegir-un-colchon-y-base/estructura-canapes-y-tapas,como-elegir-un-colchon-y-base/sistemas-apertura-canapes,informacion-fibromialgia-o-fatiga-cronica-y-el-colchon-mas-adecuado,)
         4. 'GENERAL_MARCA': si el usuario pregunta por nuestras marcas de manera générica.
         5. 'OFF_TOPIC': El usuario pregunta sobre política, deportes, religión, cocina, matemáticas, programación, famosos, clima o CUALQUIER TEMA que no sea descanso o relacionado con un ecommerce de colchones.es.
@@ -483,7 +486,7 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     
     # --- NUEVO: BLOQUEO DE TEMAS ---
     if intencion == "OFF_TOPIC":
-        respuesta_off = "Soy un asistente virtual especializado exclusivamente en descanso y productos de Colchones.es. No puedo opinar sobre otros temas, pero estaré encantado de ayudarte a elegir tu próximo equipo de descanso."
+        respuesta_off = f"Soy un asistente virtual especializado exclusivamente en descanso y productos de Colchones.es. No puedo opinar sobre otros temas, reformula tu pregunta o puedes dejarnos un correo o teléfono para poder contactar contigo: <div class='bloqueLeadChati'>        <input type='text' placeholder='Correo o teléfono' style='width:85%; padding:8px;' name='telefonoCorreoCliente' id='telefonoCorreoCliente'/>        <input type='hidden' name='cookieUsuario' id='cookieUsuario' value='{input_data.user_id}'/>     <input type='hidden' name='articuloVisitado' id='articuloVisitado' value='{input_data.articulo_id}'/> <button type='button' style='padding: 10px 9px;    cursor: pointer;    background: #4c9b9d;    float: right;    border: solid 1px #4c9b9d;' onclick='enviarContactoChati()' id='botonEnviarContactoChati'>Enviar</button></div>"
         
         # Guardamos la interacción para que conste, pero no gastamos tokens de GPT-4
         guardar_interaccion({
@@ -539,10 +542,10 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         sys_prompt += "Tu objetivo es recomendar el colchón ideal. Pide peso y altura si faltan. Usa 'recomendar_colchon'."
     elif intencion == "BUSCADOR":
         tools_activas = [tool.buscar_accesorios]
-        sys_prompt += "Ayuda a encontrar productos o marcas. Usa 'buscar_accesorios_xml'."
+        sys_prompt += "Ayuda a encontrar productos, urls de productos o marcas. Usa 'buscar_accesorios_xml'."
     elif intencion == "FICHA_PRODUCTO":
         tools_activas = [tool.consultar_ficha]
-        sys_prompt += "Responde dudas sobre el producto que el usuario esta viendo en la web (te pasamos el contenido integro de la ficha de producto). Usa 'consultar_producto_actual' para leer sus datos."
+        sys_prompt += "Responde dudas sobre el producto que el usuario esta viendo en la web (precio, datos del producto, donde probarlo o donde comprarlo) (te pasamos el contenido integro de la ficha de producto). Usa 'consultar_producto_actual' para leer sus datos ."
     elif intencion == "GENERAL_MARCA":
         tools_activas = [tool.rag_datos_generales_tienda]
         sys_prompt += "Responde dudas usando la información de la tienda. Si no está en tu conocimiento, di que no lo sabes."
@@ -552,8 +555,8 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
     
     sys_prompt += """    
     INSTRUCCIONES DE FORMATO Y MAQUETACIÓN:
-    1. Tu respuesta se mostrará en una web, así que USA HTML para estructurar el texto y poner enlaces.
-    2. NUNCA devuelvas un "muro de texto" denso. Se claro y CONCISO.
+    1. Tu respuesta se mostrará en una web, así que USA HTML para estructurar el texto y poner enlaces (usa <p> para párrafos, por ejemplo). No uses ** ** para resaltar palabras, usa negritas con la etiqueta <strong>
+    2. NUNCA devuelvas un "muro de texto" denso. Se claro y CONCISO. Y usa correctamente los signos de puntuación: detrás de un punto y una coma irá un espacio.
     3. Si tienes que listar pasos, requisitos o puntos importantes, usa listas desordenadas HTML:
        <ul>
          <li><strong>Concepto clave:</strong> Explicación...</li>
@@ -561,14 +564,13 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
        </ul>
     4. Usa etiquetas <br> para separar párrafos.
     5. Usa <strong> para las negritas (no uses **asteriscos**).
-    6. Deja espacio visual entre conceptos."""
+    6. Deja espacio visual entre conceptos mediante <br>.
+    7. No uses este tipo de formato: [guía de compra](https://www.colchones.es/sobre-como-comprar.php), tienes que maquetarlo así: <a href='https://www.colchones.es/sobre-como-comprar.php' target='_blank'>guía de compra</a>
+    8. No uses el término 'guía de compra', es preferible que uses 'información del proceso de compra' """
     
     sys_prompt += "\nINSTRUCCIÓN FINAL DE RENDERIZADO:"
     sys_prompt += "\nSi una herramienta te devuelve código HTML (etiquetas <a>, <div>, <img>), TU ÚNICA TAREA ES COPIAR Y PEGAR ESE CÓDIGO HTML TAL CUAL EN TU RESPUESTA."
     sys_prompt += "\nNO lo conviertas a Markdown."
-    sys_prompt += "\nNO cambies el formato."
-    sys_prompt += "\nNO extraigas el texto."
-    sys_prompt += "\nSimplemente escupe el HTML crudo que recibas."
 
     # 2. CHAT CON OPENAI
     
@@ -626,5 +628,10 @@ async def chat_endpoint(input_data: ChatInput, api_key: str = Security(api_key_h
         return {"response": respuesta_final}
 
     except Exception as e:
+        guardar_interaccion({
+            'user_id': input_data.user_id, 'pregunta': input_data.message, 'respuesta': "Error Api",
+            'url': input_data.url, 'dominio': input_data.dominio, 'articulo_id': input_data.articulo_id, 'nombre_producto': input_data.nombre_producto
+        })
         traceback.print_exc()
-        return {"response": "Lo siento, hubo un error técnico en el servidor."}
+        
+        return {"response": f"Ahora mismo no puedo responder preguntas por problemas técnicos. Pero puedes dejarnos un correo o teléfono para poder contactar contigo: <div class='bloqueLeadChati'>        <input type='text' placeholder='Correo o teléfono' style='width:85%; padding:8px;' name='telefonoCorreoCliente' id='telefonoCorreoCliente'/>        <input type='hidden' name='cookieUsuario' id='cookieUsuario' value='{input_data.user_id}'/>     <input type='hidden' name='articuloVisitado' id='articuloVisitado' value='{input_data.articulo_id}'/> <button type='button' style='padding: 10px 9px;    cursor: pointer;    background: #4c9b9d;    float: right;    border: solid 1px #4c9b9d;' onclick='enviarContactoChati()' id='botonEnviarContactoChati'>Enviar</button></div>"}
